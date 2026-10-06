@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- Each dependency and included service has a `Classified by` property in `datadog-model.dsl` that names the rule that placed it: a `[classify]` pattern, its span type, a name hint, or none.
+
 ### Fixed
 
 - Services whose names make the same identifier (`cart-service`, `cart.service`, `cart_service`) were drawn as one element with the relationships of all of them. A service named `user`, or `<system>_system`, was merged into the person or the system the same way. Each name now gets its own element: the first keeps the identifier, later ones get `_2`, `_3`, and the run prints a warning. Components are handled the same way.

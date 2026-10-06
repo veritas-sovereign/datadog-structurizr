@@ -248,3 +248,22 @@ def test_every_identifier_is_unique(offline_cfg):
 
 def test_no_warnings_without_collisions(offline_cfg):
     assert _model(offline_cfg, calls=["cart-service"], resources=[("GET /cart", 1)]).warnings == []
+
+
+def test_each_dependency_records_why_it_got_its_kind(offline_cfg):
+    cfg = _cfg(offline_cfg, datastores=("ledger",), include=("checkout-worker",))
+    m = build_model({"calls": ["ledger", "cache-node-01", "pricing-web", "stripe-api", "orders-db", "aws.sqs",
+                               "pricing", "checkout-worker"]}, [], {}, cfg,
+                    {"checkout-worker": {"calls": [], "called_by": []}},
+                    types={"cache-node-01": {"redis": 4}, "pricing-web": {"web": 9}, "stripe-api": {"http": 2}})
+    assert {e.name: e.basis for e in m.all_elements() if e.basis} == {
+        "ledger": "[classify] datastores pattern ledger",
+        "cache-node-01": "span type redis",
+        "pricing-web": "span type web",
+        "stripe-api": "span type http and name hint stripe",
+        "orders-db": "name hint db",
+        "aws.sqs": "name hint aws.",
+        "pricing": "no span type or name hint matched",
+        "checkout-worker": "[system] include",
+    }
+    assert not m.target_container.basis and not m.person.basis

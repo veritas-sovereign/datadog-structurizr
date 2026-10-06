@@ -88,11 +88,12 @@ class _Keys:
         return key
 
 
-def _matches(name: str, hints: tuple[str, ...]) -> bool:
+def _hint(name: str, hints: tuple[str, ...]) -> str:
+    """The first hint the name matches, or ""."""
     lower = name.lower()
     tokens = set(re.split(r"[^a-z0-9]+", lower))
     # "db" only as a whole token, everything else as substring
-    return any((h in tokens) if h == "db" else (h in lower) for h in hints)
+    return next((h for h in hints if ((h in tokens) if h == "db" else (h in lower))), "")
 
 
 def _definition_attrs(definition: dict[str, Any]) -> dict[str, Any]:
@@ -155,9 +156,38 @@ def _group_resources(resources: list[dict[str, Any]], max_components: int = 12,
     return ranked
 
 
-def _glob(name: str, patterns: tuple[str, ...]) -> bool:
+def _pattern(name: str, patterns: tuple[str, ...]) -> str:
+    """The first pattern the name matches, or ""."""
     lower = name.lower()
-    return any(fnmatch.fnmatchcase(lower, pat.lower()) for pat in patterns)
+    return next((pat for pat in patterns if fnmatch.fnmatchcase(lower, pat.lower())), "")
+
+
+def _classify(name: str, span_type: str, cfg: Config) -> tuple[str, str]:
+    """(datastore | external | internal, the reason), for one dependency.
+
+    Explicit classification first, then the span type Datadog recorded, then
+    the name hints. The reason is written to the DSL, so a wrong guess can be
+    traced to the rule that made it.
+    """
+    for kind, option, patterns in (("datastore", "datastores", cfg.datastores),
+                                   ("external", "external", cfg.external),
+                                   ("internal", "internal", cfg.internal)):
+        pattern = _pattern(name, patterns)
+        if pattern:
+            return kind, f"[classify] {option} pattern {pattern}"
+    external = _hint(name, EXTERNAL_HINTS)
+    if span_type in DATASTORE_TYPES:
+        return "datastore", f"span type {span_type}"
+    if span_type in SERVICE_TYPES:
+        if external:
+            return "external", f"span type {span_type} and name hint {external}"
+        return "internal", f"span type {span_type}"
+    datastore = _hint(name, DATASTORE_HINTS)
+    if datastore and not external:
+        return "datastore", f"name hint {datastore}"
+    if external:
+        return "external", f"name hint {external}"
+    return "internal", "no span type or name hint matched"
 
 
 def _container_meta(meta: dict[str, Any]) -> tuple[str, str]:
@@ -202,7 +232,8 @@ def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
         if name not in services:
             services[name] = Element(keys(name), name, "container",
                                      "Container of the system observed in APM.",
-                                     technology="APM service", parent_key=system.key)
+                                     technology="APM service", parent_key=system.key,
+                                     basis="[system] include")
             system.children.append(services[name])
 
     model = C4Model(
@@ -214,40 +245,23 @@ def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
 
     def neighbour(name: str) -> Element | None:
         """The element for a dependency name, creating it on first sight; None if ignored."""
-        if _glob(name, cfg.ignore):
+        if _pattern(name, cfg.ignore):
             return None
         if name in services:
             return services[name]
         key = keys(name)
-        # Explicit classification first, then the span type Datadog recorded,
-        # then the name hints.
         span_type = _span_type(types.get(name))
-        if _glob(name, cfg.datastores):
-            kind = "datastore"
-        elif _glob(name, cfg.external):
-            kind = "external"
-        elif _glob(name, cfg.internal):
-            kind = "internal"
-        elif span_type in DATASTORE_TYPES:
-            kind = "datastore"
-        elif span_type in SERVICE_TYPES:
-            kind = "external" if _matches(name, EXTERNAL_HINTS) else "internal"
-        elif _matches(name, DATASTORE_HINTS) and not _matches(name, EXTERNAL_HINTS):
-            kind = "datastore"
-        elif _matches(name, EXTERNAL_HINTS):
-            kind = "external"
-        else:
-            kind = "internal"
+        kind, basis = _classify(name, span_type, cfg)
         if kind == "datastore":
             el = Element(key, name, "container", "Datastore used by the system.",
                          technology=span_type if span_type in DATASTORE_TYPES else "Datastore",
-                         database=True, parent_key=system.key)
+                         database=True, parent_key=system.key, basis=basis)
             system.children.append(el)
         elif kind == "external":
-            el = Element(key, name, "system", "External service.", external=True)
+            el = Element(key, name, "system", "External service.", external=True, basis=basis)
             model.systems.append(el)
         else:
-            el = Element(key, name, "system", "Internal service observed in APM.")
+            el = Element(key, name, "system", "Internal service observed in APM.", basis=basis)
             model.systems.append(el)
         services[name] = el
         return el
