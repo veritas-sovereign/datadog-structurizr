@@ -36,11 +36,18 @@ DATASTORE_HINTS = (
 )
 HTTP_GROUP = "HTTP endpoint group"
 ENTRY_POINT = "Entry point"
-# Probe endpoints are not architecture; drop them from L2.
-_PROBE_RE = re.compile(r"/(health|healthz|healthcheck|ready|readyz|live|livez|ping|metrics)/?$",
-                       re.IGNORECASE)
+UNROUTED = "Unrouted HTTP"
+STATIC = "Static content"
+# Probe endpoints are not architecture; drop them from L2. A path is a probe
+# when its last segment is one of these or ends in "health" (vhealth,
+# app-health), or when any segment is "actuator" (Spring Boot).
+_PROBE_LAST = re.compile(r"^([\w.-]*health|healthz|healthcheck|ready|readyz|live|livez|ping|metrics)$",
+                         re.IGNORECASE)
+# Files a web server hands out, optionally pre-compressed (.br, .gz).
+_STATIC_RE = re.compile(r"\.(m?js|css|map|png|jpe?g|gif|svg|ico|webp|avif|woff2?|ttf|eot|html?|txt)"
+                        r"(\.(br|gz))?$", re.IGNORECASE)
 
-_HTTP_RE = re.compile(r"^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\S+)", re.IGNORECASE)
+_HTTP_RE = re.compile(r"^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)(?:\s+(\S+))?$", re.IGNORECASE)
 _NOISE_SEGMENT = re.compile(r"^(api|v\d+|\{.*\}|:.*|<.*>|\d+|\?.*)$", re.IGNORECASE)
 
 
@@ -65,21 +72,43 @@ def _definition_attrs(definition: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _group_resources(resources: list[dict[str, Any]],
-                     max_components: int = 12) -> list[tuple[str, str, list[str], int]]:
+def _strip_prefix(path: str, prefixes: tuple[str, ...]) -> str:
+    for prefix in prefixes:
+        prefix = prefix.rstrip("/")
+        if path == prefix or path.startswith(prefix + "/"):
+            return path[len(prefix):] or "/"
+    return path
+
+
+def _is_probe(path: str) -> bool:
+    segments = [s for s in path.split("/") if s]
+    return bool(segments) and (_PROBE_LAST.match(segments[-1]) is not None
+                               or any(s.lower() == "actuator" for s in segments))
+
+
+def _group_resources(resources: list[dict[str, Any]], max_components: int = 12,
+                     strip_prefixes: tuple[str, ...] = ()) -> list[tuple[str, str, list[str], int]]:
     """Return [(component name, technology, sample resources, hits)] sorted by hits."""
     groups: dict[tuple[str, str], list[tuple[str, int]]] = defaultdict(list)
     for r in resources:
         res, hits = r["resource"], r["hits"]
         m = _HTTP_RE.match(res)
-        if m and _PROBE_RE.search(m.group(2)):
-            continue
-        if m:
-            segments = [s for s in m.group(2).split("/") if s and not _NOISE_SEGMENT.match(s)]
-            name = f"{segments[0].title() if segments else 'Root'} API"
-            groups[(name, HTTP_GROUP)].append((res, hits))
-        else:
+        if not m:
             groups[(res[:40], ENTRY_POINT)].append((res, hits))
+            continue
+        if m.group(2) is None:
+            # A method with no route: the tracer did not record which endpoint.
+            groups[(UNROUTED, HTTP_GROUP)].append((res, hits))
+            continue
+        path = _strip_prefix(m.group(2), strip_prefixes)
+        if _is_probe(path):
+            continue
+        if _STATIC_RE.search(path):
+            groups[(STATIC, HTTP_GROUP)].append((res, hits))
+            continue
+        segments = [s for s in path.split("/") if s and not _NOISE_SEGMENT.match(s)]
+        name = f"{segments[0].title() if segments else 'Root'} API"
+        groups[(name, HTTP_GROUP)].append((res, hits))
 
     ranked = sorted(
         ((name, tech, [r for r, _ in items], sum(h for _, h in items))
@@ -191,7 +220,7 @@ def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
     # person or, without one, by the services observed calling the target.
     callers = ([person.key] if person else
                [r.source_key for r in model.relationships if r.target_key == container.key])
-    groups = _group_resources(resources, cfg.max_components)
+    groups = _group_resources(resources, cfg.max_components, cfg.strip_prefixes)
     if not groups:
         groups = [("Request Handlers", "unknown",
                    ["No indexed spans found - refine by hand."], 0)]
