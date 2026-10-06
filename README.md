@@ -81,6 +81,7 @@ Pick one:
 | --- | --- | --- |
 | [PyPI](#from-pypi) | everyday use | Python 3.9+; optionally `mmdc` (Node.js) to render SVGs |
 | [From source](#from-source) | changing the tool or running its tests | Python 3.9+, git |
+| [Docker](#docker) | running without Python | Docker; build the image yourself for now |
 
 You also need a Datadog API key and application key. See [Datadog access](#datadog-access).
 
@@ -130,6 +131,24 @@ npm install -g @mermaid-js/mermaid-cli
    ```
 
 To use the code without installing it, run `pip install -r requirements.txt` and prefix commands with `PYTHONPATH=src`.
+
+### Docker
+
+The [`Dockerfile`](Dockerfile) builds an image with the tool and no renderers. It is not published yet; CI builds and tests it on every change. Build it from a clone:
+
+```bash
+docker build -t datadog-structurizr .
+```
+
+Run it in the folder that holds `c4.toml`. `--user` makes the output files yours, and the keys come from the environment:
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" \
+  -e DD_API_KEY -e DD_APP_KEY \
+  datadog-structurizr -c c4.toml -o . --no-render
+```
+
+The image has no `mmdc` or structurizr-cli, so use `--no-render`, and [view](#viewing-locally) or validate the output with the `structurizr/structurizr` image.
 
 ## Usage
 
@@ -400,7 +419,8 @@ datadog-structurizr/
 │       └── render.py            optional rendering with mmdc, or structurizr-cli and plantuml
 ├── examples/
 │   ├── README.md                how to run the sample
-│   └── checkout-web/            sample c4.toml and saved Datadog responses
+│   ├── checkout-web/            sample c4.toml and saved Datadog responses
+│   └── github-actions/c4.yml    example workflow: rebuild, validate, refresh from Datadog
 ├── tests/
 │   ├── conftest.py              clean environment and shared settings
 │   ├── test_examples.py         end-to-end offline runs
@@ -409,10 +429,12 @@ datadog-structurizr/
 │   ├── test_mapper.py           boundary, classification, ignore, person and components
 │   └── test_emitter.py          DSL nesting and Mermaid views
 ├── .github/
-│   ├── dependabot.yml           weekly updates for GitHub Actions
+│   ├── dependabot.yml           weekly updates for GitHub Actions and the Docker base image
 │   └── workflows/
-│       ├── test.yml             runs pytest and the example on Python 3.9 and 3.13
+│       ├── test.yml             pytest on Python 3.9 and 3.13, Structurizr validation, Docker image build
 │       └── publish-pypi.yml     builds the package; publishes it to PyPI on v* tags
+├── Dockerfile                   image with the tool and no renderers; not published yet
+├── .dockerignore
 ├── .env.example                 settings template
 ├── pyproject.toml               package metadata and datadog-structurizr command
 ├── requirements.txt             runtime dependencies
