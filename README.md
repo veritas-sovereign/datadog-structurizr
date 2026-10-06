@@ -243,7 +243,7 @@ Datadog keys only come from the environment. Environment variables can also come
 | --- | --- | --- |
 | `DD_API_KEY` | yes, unless `--offline` | Datadog API key |
 | `DD_APP_KEY` | yes, unless `--offline` | Datadog application key with `apm_read` |
-| `DD_SITE` | no | Datadog site: `datadoghq.com` (default), `datadoghq.eu`, `us3.datadoghq.com`, `us5.datadoghq.com`, `ap1.datadoghq.com` |
+| `DD_SITE` | no | Datadog site: `datadoghq.com` (default), `datadoghq.eu`, `us3.datadoghq.com`, `us5.datadoghq.com`, `ap1.datadoghq.com`. A copied `api.` or `app.` prefix, `https://` and a trailing `/` are removed |
 | `DD_SERVICE` | no, if given elsewhere | APM service name |
 | `DD_ENV` | no, if given elsewhere | APM environment |
 | `DD_LOOKBACK_HOURS` | no | lookback window in hours (default 24) |
@@ -309,6 +309,15 @@ output/
 | [structurizr-cli](https://docs.structurizr.com/cli) + [PlantUML](https://plantuml.com/) | both on `PATH` | `plantuml/*.puml` and `plantuml/*.svg` |
 
 When neither is installed, only the sources are written. The generated workspace sets no theme, so structurizr-cli needs no network access to read it.
+
+structurizr-cli is end of life; it still works when installed. Its replacement is the `export` command of the `structurizr/structurizr` image, which takes the same options. It writes PlantUML or Mermaid sources from `workspace.dsl`, so unlike the tool's own `.mmd` files they include your hand edits:
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/output:/usr/local/structurizr" structurizr/structurizr \
+  export -w /usr/local/structurizr/workspace.dsl -f plantuml/c4plantuml -o /usr/local/structurizr/export
+```
+
+Use `-f mermaid` for Mermaid. The image renders PNG or SVG only from a running Structurizr page (`-url`), so render the exported sources with `plantuml` or `mmdc`.
 
 ### Viewing locally
 

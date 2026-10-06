@@ -54,6 +54,21 @@ jobs:
             docker run --rm -v "$RUNNER_TEMP/c4:/usr/local/structurizr" "$IMAGE" \
               validate -workspace "/usr/local/structurizr/$f"
           done
+      - name: Export PlantUML and Mermaid with the image, as the README documents
+        run: |
+          for fmt in plantuml/c4plantuml mermaid; do
+            out="export-${fmt%%/*}"
+            docker run --rm --user "$(id -u):$(id -g)" -v "$RUNNER_TEMP/c4:/usr/local/structurizr" "$IMAGE" \
+              export -w /usr/local/structurizr/workspace.dsl -f "$fmt" -o "/usr/local/structurizr/$out"
+            ls -l "$RUNNER_TEMP/c4/$out"
+            for view in L0-SystemContext L1-Containers L2-Components; do
+              f=$(ls "$RUNNER_TEMP/c4/$out"/*"$view"* 2>/dev/null | grep -v -- '-key' | head -1)
+              test -s "$f" || { echo "no $fmt export for $view"; exit 1; }
+            done
+          done
+          # The hand-written Cart API -> cart-service relationship reaches the export:
+          # without it, cart-service is not in the L2 view at all.
+          grep -q "cart-service" $(ls "$RUNNER_TEMP/c4/export-mermaid"/*L2-Components* | grep -v -- '-key')
       - name: A dangling identifier fails validation, for that reason
         run: |
           sed -i 's|-> \(cart_service\) "Calls"|-> renamed_service "Calls"|' "$RUNNER_TEMP/c4/workspace.dsl"
