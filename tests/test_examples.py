@@ -99,3 +99,17 @@ def test_api_error_exits_non_zero_and_writes_nothing(tmp_path, monkeypatch, caps
     assert rc == 1
     assert "403" in capsys.readouterr().err
     assert not (out / "workspace.dsl").exists()
+
+
+def test_no_raw_run_draws_diagrams_and_saves_no_responses(tmp_path, monkeypatch, capsys):
+    from test_client import fake_datadog
+
+    monkeypatch.setenv("DD_API_KEY", "k")
+    monkeypatch.setenv("DD_APP_KEY", "a")
+    fake_datadog(monkeypatch)
+    out = tmp_path / "o"
+    rc = main(["--service", "web", "--env", "prod", "-o", str(out), "--no-render", "--no-input", "--no-raw"])
+    assert rc == 0
+    assert "responses not saved (--no-raw)" in capsys.readouterr().out
+    assert (out / "datadog-model.dsl").exists()
+    assert not (out / "raw").exists() and not list(out.glob(".raw-*"))

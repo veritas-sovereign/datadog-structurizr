@@ -38,6 +38,9 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
                      help="draw no person; for services only called by other services")
     cli.add_argument("--offline", action="store_true",
                      help="rebuild from <output>/raw/*.json instead of calling Datadog")
+    cli.add_argument("--no-raw", action="store_true",
+                     help="do not save the Datadog responses to <output>/raw/; they hold internal "
+                          "service and route names, and --offline needs them")
     cli.add_argument("--no-render", action="store_true",
                      help="write .dsl and .mmd sources only; do not render images")
     cli.add_argument("--no-input", action="store_true",
@@ -57,6 +60,7 @@ def main(argv: list[str] | None = None) -> int:
             "INCLUDE": tuple(n for group in args.include for n in group),
             "NO_PERSON": "1" if args.no_person else None,
             "OFFLINE": "1" if args.offline else None,
+            "NO_RAW": "1" if args.no_raw else None,
         },
         config_file=args.config,
         prompt=input if interactive else None,
@@ -71,6 +75,9 @@ def main(argv: list[str] | None = None) -> int:
         # right but is not.
         print(f"error: {exc}", file=sys.stderr)
         return 1
+    if not cfg.save_raw:
+        print("      responses not saved (--no-raw)"
+              + (f"; {cfg.raw_dir} is from an earlier run" if cfg.raw_dir.exists() else ""))
     deps, member_deps, resources = fetched.deps, fetched.member_deps, fetched.resources
     print(f"      calls={len(deps.get('calls') or [])} "
           f"called_by={len(deps.get('called_by') or [])} resources={len(resources)}"

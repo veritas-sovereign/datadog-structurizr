@@ -41,6 +41,7 @@ class Config:
     lookback_hours: int
     output_dir: Path
     offline: bool  # rebuild from output/raw/*.json instead of calling Datadog
+    save_raw: bool = True  # False: keep the responses in memory only (--no-raw)
     # Model inputs. Names in include are exact; the other lists accept fnmatch globs.
     system_name: str = ""
     system_description: str = ""
@@ -135,6 +136,9 @@ def load_config(overrides: dict[str, Any] | None = None,
         return default
 
     offline = bool(cli.get("OFFLINE"))
+    save_raw = not cli.get("NO_RAW")
+    if offline and not save_raw:
+        raise SystemExit("--no-raw cannot be used with --offline, which reads the saved responses.")
     service = get("DD_SERVICE", file.get("service"), "DD_SERVICE")
     env = get("DD_ENV", file.get("env"), "DD_ENV")
     if prompt:
@@ -155,7 +159,7 @@ def load_config(overrides: dict[str, Any] | None = None,
         )
 
     output_dir = Path(get("OUTPUT_DIR", file.get("output"), "OUTPUT_DIR", "output"))
-    (output_dir / "raw").mkdir(parents=True, exist_ok=True)
+    (output_dir / "raw" if save_raw else output_dir).mkdir(parents=True, exist_ok=True)
 
     include = [*system.get("include", []), *cli.get("INCLUDE", ())]
     return Config(
@@ -167,6 +171,7 @@ def load_config(overrides: dict[str, Any] | None = None,
         lookback_hours=int(get("DD_LOOKBACK_HOURS", file.get("hours"), "DD_LOOKBACK_HOURS", 24)),
         output_dir=output_dir,
         offline=offline,
+        save_raw=save_raw,
         system_name=get("SYSTEM_NAME", system.get("name"), None, ""),
         system_description=system.get("description", ""),
         include=tuple(dict.fromkeys(n for n in include if n != service)),

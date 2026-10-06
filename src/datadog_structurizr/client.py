@@ -241,7 +241,8 @@ class Fetched:
 
 
 def fetch_all(cfg: Config) -> Fetched:
-    """Every input of one run. Online, raw/ is replaced only after all calls succeed."""
+    """Every input of one run. Online, raw/ is replaced only after all calls succeed,
+    and not at all with --no-raw."""
     deps = fetch_service_dependencies(cfg)
     member_deps = {name: fetch_service_dependencies(cfg, name) for name in cfg.include}
     neighbours = sorted({n for d in (deps, *member_deps.values())
@@ -253,7 +254,7 @@ def fetch_all(cfg: Config) -> Fetched:
         definition=fetch_service_definition(cfg),
         types=fetch_span_types(cfg, neighbours),
     )
-    if not cfg.offline:
+    if not cfg.offline and cfg.save_raw:
         files = {"dependencies": fetched.deps, "resources": fetched.resources,
                  "types": fetched.types}
         files.update((_dependencies_name(cfg, name), deps) for name, deps in fetched.member_deps.items())
