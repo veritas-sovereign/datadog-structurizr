@@ -107,7 +107,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print("\nDone. Outputs:")
     print(f"  DSL : {dsl_path} (includes {MODEL_FILE}, {VIEWS_FILE})")
-    print(f"  DSL : {inline_path} (single file for the online DSL editor)")
+    print(f"  DSL : {inline_path} (single file for the Structurizr playground)")
     for p in mmd_files:
         print(f"  MMD : {p}")
     for p in images:

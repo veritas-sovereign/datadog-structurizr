@@ -110,7 +110,7 @@ def emit_workspace(model: C4Model) -> str:
 
 
 def inline_includes(workspace: str, directory: Path) -> str:
-    """workspace.dsl with the generated fragments pasted in, for the online DSL editor."""
+    """workspace.dsl with the generated fragments pasted in, for the Structurizr playground."""
     out = []
     for line in workspace.splitlines():
         name = line.strip().removeprefix("!include").strip()

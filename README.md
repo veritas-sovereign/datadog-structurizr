@@ -267,7 +267,7 @@ output/
 ├── workspace.dsl            yours: created once, never overwritten; includes the two files below
 ├── datadog-model.dsl        generated elements and relationships; rewritten every run
 ├── datadog-views.dsl        generated L0-SystemContext, L1-Containers, L2-Components views; rewritten every run
-├── workspace-inline.dsl     workspace.dsl with both files pasted in, for the online DSL editor
+├── workspace-inline.dsl     workspace.dsl with both files pasted in, for the Structurizr playground
 ├── L0-SystemContext.mmd     Mermaid C4Context
 ├── L1-Containers.mmd        Mermaid C4Container
 ├── L2-Components.mmd        Mermaid C4Component
