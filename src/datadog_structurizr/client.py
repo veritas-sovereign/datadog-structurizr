@@ -43,16 +43,15 @@ def _retry_wait(resp: requests.Response) -> int | None:
 
 def _send(call: Callable[..., requests.Response], url: str, **kwargs: Any) -> requests.Response:
     """requests.get or requests.post, retrying when Datadog answers 429."""
-    for attempt in range(MAX_RETRIES + 1):
-        resp = call(url, **kwargs)
-        if resp.status_code != 429 or attempt == MAX_RETRIES:
-            return resp
-        wait = _retry_wait(resp)
+    resp = call(url, **kwargs)
+    for _ in range(MAX_RETRIES):
+        wait = _retry_wait(resp) if resp.status_code == 429 else None
         if wait is None:
             return resp
         limit = resp.headers.get("x-ratelimit-name", "Datadog")
         print(f"      rate limited ({limit}); retrying in {wait}s", file=sys.stderr)
         time.sleep(wait)
+        resp = call(url, **kwargs)
     return resp
 
 

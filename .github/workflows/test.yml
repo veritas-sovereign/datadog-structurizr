@@ -29,6 +29,17 @@ jobs:
           test -s checkout-web/workspace.dsl
           ls checkout-web/*.mmd
 
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: pip install -e '.[dev]'
+      - run: ruff check src tests
+      - run: pyright
+
   structurizr:
     # The generated workspace must pass Structurizr's own validation, and a
     # hand-written relationship to a missing element must fail it.

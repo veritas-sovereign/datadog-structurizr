@@ -110,4 +110,6 @@ def test_dsl_writes_the_classification_reason_as_a_property(offline_cfg):
     assert ('        tags "Database"\n'
             '        properties {\n'
             '            "Classified by" "name hint postgres"\n') in dsl
-    assert 'checkout_web = container "checkout-web" "Application container." "APM service" {\n        checkout_web__' in dsl
+    # The target container has no basis, so its first child line follows its opening line.
+    assert ('checkout_web = container "checkout-web" "Application container." "APM service" {\n'
+            '        checkout_web__') in dsl

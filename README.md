@@ -118,7 +118,7 @@ npm install -g @mermaid-js/mermaid-cli
    source .venv/bin/activate          # Windows: .venv\Scripts\activate
    ```
 
-3. Install the package in editable mode. Add `[dev]` to also install pytest.
+3. Install the package in editable mode. Add `[dev]` to also install pytest, ruff and pyright.
 
    ```bash
    pip install -e .                   # or: pip install -e '.[dev]'
@@ -422,6 +422,8 @@ See [`examples/README.md`](examples/README.md) for how to run it.
 ```bash
 pip install -e '.[dev]'
 pytest
+ruff check src tests
+pyright
 ```
 
 The tests replace the Datadog calls with fakes, so they need no keys or network access. They run `examples/checkout-web/` end to end and cover configuration, the client, the mapper and the emitter.
@@ -454,7 +456,7 @@ datadog-structurizr/
 ├── .github/
 │   ├── dependabot.yml           weekly updates for GitHub Actions and the Docker base image
 │   └── workflows/
-│       ├── test.yml             pytest on Python 3.9 and 3.13, Structurizr validation, Docker image build
+│       ├── test.yml             pytest on Python 3.9 and 3.13, ruff and pyright, Structurizr validation, Docker image build
 │       ├── publish-pypi.yml     builds the package; publishes it to PyPI on v* tags
 │       └── publish-image.yml    tests the image; publishes it to GHCR on v* tags
 ├── Dockerfile                   image with the tool and no renderers; published to GHCR on releases
@@ -494,7 +496,7 @@ Datadog ──► client.py ──► mapper.py ──► emitter.py ──► d
 
 ## Contributing
 
-Issues and pull requests are welcome at [veritas-sovereign/datadog-structurizr](https://github.com/veritas-sovereign/datadog-structurizr). Run `pytest` before opening a pull request (GitHub Actions runs it too), and add saved responses to `examples/` when you change how Datadog data is read.
+Issues and pull requests are welcome at [veritas-sovereign/datadog-structurizr](https://github.com/veritas-sovereign/datadog-structurizr). Run `pytest`, `ruff check src tests` and `pyright` before opening a pull request (GitHub Actions runs them too), and add saved responses to `examples/` when you change how Datadog data is read.
 
 ## License
 

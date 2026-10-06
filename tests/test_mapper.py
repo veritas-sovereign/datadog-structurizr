@@ -142,6 +142,7 @@ def test_system_name_and_description(offline_cfg):
 def test_custom_person(offline_cfg):
     cfg = _cfg(offline_cfg, person_name="Shopper", person_description="Buys things.")
     m = _model(cfg)
+    assert m.person
     assert (m.person.name, m.person.description) == ("Shopper", "Buys things.")
 
 
@@ -176,7 +177,8 @@ def test_static_files_grouped_once():
 def test_method_without_route_is_one_unrouted_group():
     groups = _group_resources([{"resource": "GET", "hits": 5}, {"resource": "POST", "hits": 3},
                                {"resource": "order.created consume", "hits": 1}])
-    assert [(g[0], g[1], g[3]) for g in groups] == [(UNROUTED, HTTP_GROUP, 8), ("order.created consume", ENTRY_POINT, 1)]
+    assert [(g[0], g[1], g[3]) for g in groups] == [(UNROUTED, HTTP_GROUP, 8),
+                                                    ("order.created consume", ENTRY_POINT, 1)]
 
 
 def test_strip_prefixes_splits_a_context_path():
@@ -219,7 +221,7 @@ def test_names_with_the_same_identifier_stay_separate(offline_cfg):
 
 def test_service_named_like_the_person_is_not_the_person(offline_cfg):
     m = _model(offline_cfg, calls=["user"])
-    assert m.person.key == "user"
+    assert m.person and m.person.key == "user"
     assert [(s.name, s.key) for s in m.systems] == [("user", "user_2")]
     assert ("checkout_web", "user_2") in {(r.source_key, r.target_key) for r in m.relationships}
 
@@ -266,4 +268,4 @@ def test_each_dependency_records_why_it_got_its_kind(offline_cfg):
         "pricing": "no span type or name hint matched",
         "checkout-worker": "[system] include",
     }
-    assert not m.target_container.basis and not m.person.basis
+    assert m.person and not m.person.basis and not m.target_container.basis
