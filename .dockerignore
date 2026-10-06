@@ -1,0 +1,17 @@
+.git
+.github
+.venv
+.env
+.env.*
+**/__pycache__
+*.py[cod]
+*.egg-info
+dist/
+build/
+.pytest_cache/
+tests/
+examples/
+output/
+*.dsl
+*.mmd
+*.svg

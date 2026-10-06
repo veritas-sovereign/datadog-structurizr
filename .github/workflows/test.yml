@@ -65,3 +65,25 @@ jobs:
           cat "$RUNNER_TEMP/validate.log"
           # Any other failure (image, path, DSL) must not count as a pass.
           grep -q '"renamed_service" does not exist' "$RUNNER_TEMP/validate.log"
+
+  docker:
+    # Build only: the image is not pushed anywhere until the release.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -t datadog-structurizr:ci .
+      - name: Runs as a non-root user and reports its version
+        run: |
+          test "$(docker run --rm --entrypoint id datadog-structurizr:ci -u)" = 10001
+          docker run --rm datadog-structurizr:ci --version
+      - name: Builds the example offline into a mounted folder
+        run: |
+          out="$RUNNER_TEMP/c4"
+          cp -r examples/checkout-web "$out"
+          docker run --rm --user "$(id -u):$(id -g)" -v "$out:/work" \
+            datadog-structurizr:ci -c c4.toml --offline -o . --no-render
+          for f in workspace.dsl datadog-model.dsl datadog-views.dsl workspace-inline.dsl \
+                   L0-SystemContext.mmd L1-Containers.mmd L2-Components.mmd; do
+            test -s "$out/$f" || { echo "missing or empty: $f"; exit 1; }
+          done
+          grep -q 'checkout_worker = container "checkout-worker"' "$out/datadog-model.dsl"
