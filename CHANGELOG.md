@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- The README's Limitations section lists what Datadog data establishes and what it does not, such as the system boundary or the absence of a call.
 - Python 3.10 or later is required. Python 3.9 reached end of life in October 2025.
 - CI runs `ruff check` and `pyright`; both are in the `dev` extra.
 
