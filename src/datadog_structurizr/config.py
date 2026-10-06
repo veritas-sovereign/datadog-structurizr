@@ -8,15 +8,16 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from dotenv import load_dotenv
 
 if sys.version_info >= (3, 11):
     import tomllib
-else:  # pragma: no cover - exercised on Python 3.9/3.10 in CI
+else:  # pragma: no cover - exercised on Python 3.10 in CI
     import tomli as tomllib
 
 # Top-level and per-table keys accepted in the config file; anything else is a typo.
