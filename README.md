@@ -279,7 +279,8 @@ output/
     ├── dependencies.json              dependencies of the service
     ├── dependencies-<service>.json    dependencies of each included service
     ├── resources.json                 resource names and span counts
-    └── definition.json                service definition, if the service has one
+    ├── definition.json                service definition, if the service has one
+    └── types.json                     span counts per span type of each neighbouring service
 ```
 
 `raw/` is replaced as a whole, and only after every Datadog call of the run has succeeded. It never mixes responses from different runs, and a failed run leaves the previous one in place. Do not keep other files in it.
@@ -327,6 +328,7 @@ Then open http://localhost:8080. Structurizr Lite and the separate `structurizr/
 | --- | --- | --- |
 | [`GET /api/v1/service_dependencies/{service}`](https://docs.datadoghq.com/api/latest/service-dependencies/) | `calls` and `called_by` of the service and of each included service: L0 and L1 | the run stops |
 | [`POST /api/v2/spans/analytics/aggregate`](https://docs.datadoghq.com/api/latest/spans/) grouped by `resource_name` | components: L2 | the run stops. L2 shows one placeholder component only when the call succeeds and finds no indexed spans |
+| [`POST /api/v2/spans/analytics/aggregate`](https://docs.datadoghq.com/api/latest/spans/) grouped by `service`, then `type`, for the neighbouring services | element types: L0, L1 | the run stops |
 | [`GET /api/v2/services/definitions/{service}`](https://docs.datadoghq.com/api/latest/service-definition/) | description, team and languages | 404 (no definition) is ignored; any other status stops the run |
 
 When Datadog answers 429 (rate limited), the call is retried up to 2 times, each after the number of seconds Datadog gives in the `x-ratelimit-reset` header. A 429 without that header, or asking for more than 60 seconds, is not retried.
@@ -342,7 +344,7 @@ When a call fails, the run prints the HTTP status, the call and Datadog's messag
 
 - The service dependencies endpoint is in public beta.
 - Span aggregates only cover **indexed** spans (those kept by retention filters). The span counts on components show relative traffic, not total requests.
-- Span aggregates were limited to 50 requests per 60 seconds when measured on a live account (the `x-ratelimit-*` response headers), and that allowance is shared with everything else in the organisation that queries spans. A run makes one or two of these requests. When it is used up, Datadog answers 429.
+- Span aggregates were limited to 50 requests per 60 seconds when measured on a live account (the `x-ratelimit-*` response headers), and that allowance is shared with everything else in the organisation that queries spans. A run makes two or three of these requests. When it is used up, Datadog answers 429.
 - Span aggregates return the **100** resource names with the most spans. Resources beyond those are not fetched and do not appear in L2, not even in `Other`. They are the least-used ones. The response has no cursor for the next page, so there is no way to fetch more.
 
 ## Mapping conventions
@@ -358,9 +360,13 @@ Each dependency name is checked against these rules in order. The first rule tha
 | matches `[classify] datastores` | database container inside the target system | L1 |
 | matches `[classify] external` | external software system, shown in grey | L0, L1 |
 | matches `[classify] internal` | internal software system | L0, L1 |
+| its own spans' most common type is a datastore type: `sql`, `redis`, `valkey`, `elasticsearch`, `opensearch`, `dynamodb`, `mongodb`, `cosmosdb` | database container inside the target system, with that type as its technology | L1 |
+| its own spans' most common type is a service type: `web`, `http`, `rpc`, `soap`, `serverless` | external system if the name matches `EXTERNAL_HINTS`, otherwise internal system; the datastore name hints are skipped | L0, L1 |
 | name matches `DATASTORE_HINTS` (`postgres`, `redis`, `kafka`, a `db` token, ...) | database container inside the target system | L1 |
 | name matches `EXTERNAL_HINTS` (`stripe`, `aws.`, `s3`, `twilio`, ...) | external software system, shown in grey | L0, L1 |
 | any other service | internal software system | L0, L1 |
+
+The span types come from one spans aggregate over the neighbouring services, grouped by service and then by `type`; spans with no type are not counted. The two type lists are the values seen on a live account, so a type outside them (for example `queue` or `custom`) leaves the decision to the name hints. A span type cannot tell an external service from an internal one.
 
 The hints are matched case-insensitively, and `db` must be a whole word, so `feedback-service` is not a datastore. The hint lists are in [`mapper.py`](src/datadog_structurizr/mapper.py). Use `[classify]` rather than editing them.
 
@@ -386,7 +392,7 @@ Element identifiers are the names with every character other than a letter, digi
 
 ## Limitations
 
-- **Names decide the element type** unless you classify them. Check L1, and use `[classify]` for anything in the wrong group.
+- **Span types and names decide the element type** unless you classify them. A dependency with no typed spans in the window, or a type outside the known lists, is classified by name. Check L1, and use `[classify]` for anything in the wrong group.
 - **No component-to-dependency relationships.** Datadog does not say which entry point calls which downstream service, so L2 shows no relationships from components to other services. Add them by hand in `workspace.dsl`.
 - **Hand edits appear only in the Structurizr output.** The Mermaid diagrams are drawn from Datadog data alone.
 - **Generated identifiers can change.** Hand-written relationships refer to generated identifiers such as `checkout_web__Cart_API`. If a service or route group is renamed or disappears, structurizr-cli reports the dangling identifier, and you fix `workspace.dsl` by hand.

@@ -77,7 +77,7 @@ def main(argv: list[str] | None = None) -> int:
           + (f" included={len(member_deps)}" if member_deps else ""))
 
     print("[2/4] Building C4 model...")
-    model = build_model(deps, resources, fetched.definition, cfg, member_deps)
+    model = build_model(deps, resources, fetched.definition, cfg, member_deps, fetched.types)
 
     print("[3/4] Writing Structurizr DSL and Mermaid sources...")
     out = cfg.output_dir
