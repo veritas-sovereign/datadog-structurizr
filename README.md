@@ -329,6 +329,8 @@ Then open http://localhost:8080. Structurizr Lite and the separate `structurizr/
 | [`POST /api/v2/spans/analytics/aggregate`](https://docs.datadoghq.com/api/latest/spans/) grouped by `resource_name` | components: L2 | the run stops. L2 shows one placeholder component only when the call succeeds and finds no indexed spans |
 | [`GET /api/v2/services/definitions/{service}`](https://docs.datadoghq.com/api/latest/service-definition/) | description, team and languages | 404 (no definition) is ignored; any other status stops the run |
 
+When Datadog answers 429 (rate limited), the call is retried up to 2 times, each after the number of seconds Datadog gives in the `x-ratelimit-reset` header. A 429 without that header, or asking for more than 60 seconds, is not retried.
+
 When a call fails, the run prints the HTTP status, the call and Datadog's message to stderr, exits with status 1, and writes no diagrams. A diagram drawn from partial data would look complete but be wrong.
 
 ### Keys and permissions
@@ -340,7 +342,7 @@ When a call fails, the run prints the HTTP status, the call and Datadog's messag
 
 - The service dependencies endpoint is in public beta.
 - Span aggregates only cover **indexed** spans (those kept by retention filters). The span counts on components show relative traffic, not total requests.
-- Span aggregates were limited to 50 requests per 60 seconds when measured on a live account (the `x-ratelimit-*` response headers), and that allowance is shared with everything else in the organisation that queries spans. A run makes one or two of these requests. When it is used up, Datadog answers 429 and the run stops.
+- Span aggregates were limited to 50 requests per 60 seconds when measured on a live account (the `x-ratelimit-*` response headers), and that allowance is shared with everything else in the organisation that queries spans. A run makes one or two of these requests. When it is used up, Datadog answers 429.
 - Span aggregates return the **100** resource names with the most spans. Resources beyond those are not fetched and do not appear in L2, not even in `Other`. They are the least-used ones. The response has no cursor for the next page, so there is no way to fetch more.
 
 ## Mapping conventions

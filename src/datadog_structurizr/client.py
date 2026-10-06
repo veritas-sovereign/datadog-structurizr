@@ -10,11 +10,12 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import sys
 import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import requests
 
@@ -23,6 +24,36 @@ from .config import Config
 
 class DatadogAPIError(RuntimeError):
     """A Datadog call failed; the run stops rather than draw from partial data."""
+
+
+# A 429 is retried after the wait Datadog asks for in x-ratelimit-reset
+# (seconds, checked on a live account), at most this often and this long.
+MAX_RETRIES = 2
+MAX_WAIT_SECONDS = 60
+
+
+def _retry_wait(resp: requests.Response) -> int | None:
+    """Seconds to wait before retrying a 429, or None to give up."""
+    try:
+        wait = int(resp.headers.get("x-ratelimit-reset", ""))
+    except (TypeError, ValueError):
+        return None
+    return max(wait, 1) if wait <= MAX_WAIT_SECONDS else None
+
+
+def _send(call: Callable[..., requests.Response], url: str, **kwargs: Any) -> requests.Response:
+    """requests.get or requests.post, retrying when Datadog answers 429."""
+    for attempt in range(MAX_RETRIES + 1):
+        resp = call(url, **kwargs)
+        if resp.status_code != 429 or attempt == MAX_RETRIES:
+            return resp
+        wait = _retry_wait(resp)
+        if wait is None:
+            return resp
+        limit = resp.headers.get("x-ratelimit-name", "Datadog")
+        print(f"      rate limited ({limit}); retrying in {wait}s", file=sys.stderr)
+        time.sleep(wait)
+    return resp
 
 
 def _check(resp: requests.Response, what: str) -> None:
@@ -87,8 +118,8 @@ def fetch_service_dependencies(cfg: Config, service: str | None = None) -> dict[
 
     end = int(time.time())
     params = {"env": cfg.env, "start": end - cfg.lookback_hours * 3600, "end": end}
-    resp = requests.get(
-        f"{_base(cfg)}/api/v1/service_dependencies/{service}",
+    resp = _send(
+        requests.get, f"{_base(cfg)}/api/v1/service_dependencies/{service}",
         headers=_headers(cfg), params=params, timeout=30,
     )
     _check(resp, f"service dependencies of {service}")
@@ -110,8 +141,8 @@ def _aggregate_resources(cfg: Config, query: str) -> list[dict[str, Any]]:
             },
         }
     }
-    resp = requests.post(
-        f"{_base(cfg)}/api/v2/spans/analytics/aggregate",
+    resp = _send(
+        requests.post, f"{_base(cfg)}/api/v2/spans/analytics/aggregate",
         headers=_headers(cfg), json=body, timeout=60,
     )
     _check(resp, f"spans aggregate ({query})")
@@ -165,8 +196,8 @@ def fetch_service_definition(cfg: Config) -> dict[str, Any]:
         except SystemExit:
             return {}
 
-    resp = requests.get(
-        f"{_base(cfg)}/api/v2/services/definitions/{cfg.service}",
+    resp = _send(
+        requests.get, f"{_base(cfg)}/api/v2/services/definitions/{cfg.service}",
         headers=_headers(cfg), timeout=30,
     )
     if resp.status_code == 404:
