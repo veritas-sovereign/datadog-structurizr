@@ -18,6 +18,15 @@ def clean_env(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
 
 
+@pytest.fixture(autouse=True)
+def sleeps(monkeypatch):
+    """Rate-limit waits are recorded, not slept."""
+    from datadog_structurizr import client
+    waited: list[float] = []
+    monkeypatch.setattr(client.time, "sleep", waited.append)
+    return waited
+
+
 @pytest.fixture
 def checkout_dir(tmp_path):
     """A copy of examples/checkout-web (c4.toml and raw responses) to write output into."""
