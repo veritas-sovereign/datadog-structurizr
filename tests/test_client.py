@@ -8,9 +8,10 @@ from datadog_structurizr import client
 
 
 class FakeResponse:
-    def __init__(self, status, body):
+    def __init__(self, status, body, headers=None):
         self.status_code, self._body = status, body
         self.text = json.dumps(body)
+        self.headers = headers or {}
 
     def json(self):
         return self._body
@@ -90,10 +91,10 @@ def test_resources_error_raises_without_fallback(monkeypatch, online_cfg):
 
     def fake_post(url, headers, json, timeout):
         queries.append(json["data"]["attributes"]["filter"]["query"])
-        return FakeResponse(429, {"errors": ["Too many requests"]})
+        return FakeResponse(503, {"errors": ["Service unavailable"]})
 
     monkeypatch.setattr(client.requests, "post", fake_post)
-    with pytest.raises(client.DatadogAPIError, match="429"):
+    with pytest.raises(client.DatadogAPIError, match="503"):
         client.fetch_resources(online_cfg)
     # The unfiltered query would count client spans as components.
     assert len(queries) == 1
@@ -171,3 +172,32 @@ def test_fetch_all_offline_writes_nothing(offline_cfg):
     before = {p.name: p.read_bytes() for p in offline_cfg.raw_dir.iterdir()}
     client.fetch_all(offline_cfg)
     assert {p.name: p.read_bytes() for p in offline_cfg.raw_dir.iterdir()} == before
+
+
+def _limited(reset="7"):
+    return FakeResponse(429, {"errors": ["Too many requests"]},
+                        {"x-ratelimit-reset": reset, "x-ratelimit-name": "spans_public_api"})
+
+
+def test_429_retried_after_the_reset_datadog_gives(monkeypatch, online_cfg, sleeps):
+    answers = [_limited("7"), _limited("3"), FakeResponse(200, {"data": [bucket({"resource_name": "GET /a"}, 1)]})]
+    monkeypatch.setattr(client.requests, "post", lambda *a, **k: answers.pop(0))
+    assert client.fetch_resources(online_cfg) == [{"resource": "GET /a", "hits": 1}]
+    assert sleeps == [7, 3]
+
+
+def test_429_gives_up_after_max_retries(monkeypatch, online_cfg, sleeps):
+    calls = []
+    monkeypatch.setattr(client.requests, "get", lambda *a, **k: calls.append(1) or _limited("1"))
+    with pytest.raises(client.DatadogAPIError, match="429"):
+        client.fetch_service_dependencies(online_cfg)
+    assert len(calls) == client.MAX_RETRIES + 1
+    assert sleeps == [1] * client.MAX_RETRIES
+
+
+@pytest.mark.parametrize("reset", ["", "soon", "3600"])
+def test_429_without_a_usable_reset_fails_at_once(monkeypatch, online_cfg, sleeps, reset):
+    monkeypatch.setattr(client.requests, "get", lambda *a, **k: _limited(reset))
+    with pytest.raises(client.DatadogAPIError, match="429"):
+        client.fetch_service_dependencies(online_cfg)
+    assert sleeps == []

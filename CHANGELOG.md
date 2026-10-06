@@ -30,4 +30,5 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Span aggregate responses are read in the shape the live API returns (`data[].attributes.by` and `attributes.compute`); a response in any other shape stops the run instead of being read as empty. Checked against a live Datadog account.
 - `.env` is read from the current directory only. Before, an editable install also found the repository's `.env` by searching upwards from the package folder.
 - L2 grouping, from a live service: probe paths are also dropped when the last segment ends in `health` or any segment is `actuator`; static files go into one `Static content` component; methods with no route go into one `Unrouted HTTP` component instead of one component each; `[components] strip_prefixes` removes a shared context path before grouping.
+- A 429 from Datadog is retried up to 2 times after the wait given in `x-ratelimit-reset` (at most 60 seconds); other failures still stop the run at once.
 - `examples/checkout-web/`: a `c4.toml` and saved responses for a web service and its worker.
