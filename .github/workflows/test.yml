@@ -28,3 +28,40 @@ jobs:
           datadog-structurizr --service checkout-web --env prod --offline -o checkout-web --no-render
           test -s checkout-web/workspace.dsl
           ls checkout-web/*.mmd
+
+  structurizr:
+    # The generated workspace must pass Structurizr's own validation, and a
+    # hand-written relationship to a missing element must fail it.
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: structurizr/structurizr:2026.09.19@sha256:721136283c2f9cf1ba69037bc9de136c579d66fdcb2d771cb60546ec68def1a5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: pip install .
+      - name: Generate the example offline, with a hand-written relationship
+        run: |
+          out="$RUNNER_TEMP/c4"
+          cp -r examples/checkout-web "$out"
+          datadog-structurizr -c "$out/c4.toml" --offline -o "$out" --no-render
+          sed -i 's|^        # \(checkout_web__Cart_API -> .*\)$|        \1|' "$out/workspace.dsl"
+          grep -q '^        checkout_web__Cart_API -> ' "$out/workspace.dsl"
+      - name: Validate workspace.dsl and workspace-inline.dsl
+        run: |
+          for f in workspace.dsl workspace-inline.dsl; do
+            docker run --rm -v "$RUNNER_TEMP/c4:/usr/local/structurizr" "$IMAGE" \
+              validate -workspace "/usr/local/structurizr/$f"
+          done
+      - name: A dangling identifier fails validation, for that reason
+        run: |
+          sed -i 's|-> \(cart_service\) "Calls"|-> renamed_service "Calls"|' "$RUNNER_TEMP/c4/workspace.dsl"
+          grep -q 'renamed_service' "$RUNNER_TEMP/c4/workspace.dsl"
+          if docker run --rm -v "$RUNNER_TEMP/c4:/usr/local/structurizr" "$IMAGE" \
+               validate -workspace /usr/local/structurizr/workspace.dsl > "$RUNNER_TEMP/validate.log" 2>&1; then
+            cat "$RUNNER_TEMP/validate.log"; echo "validate accepted a dangling identifier"; exit 1
+          fi
+          cat "$RUNNER_TEMP/validate.log"
+          # Any other failure (image, path, DSL) must not count as a pass.
+          grep -q '"renamed_service" does not exist' "$RUNNER_TEMP/validate.log"
