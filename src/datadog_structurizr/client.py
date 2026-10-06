@@ -115,7 +115,13 @@ def _aggregate_resources(cfg: Config, query: str) -> list[dict[str, Any]]:
         headers=_headers(cfg), json=body, timeout=60,
     )
     _check(resp, f"spans aggregate ({query})")
-    return resp.json().get("data", {}).get("buckets", []) or []
+    # Response: {"data": [{"type": "bucket", "attributes": {"by": {...},
+    # "compute": {"c0": n}}}], "meta": {...}}, checked against the live API.
+    data = resp.json().get("data")
+    if not isinstance(data, list):
+        raise DatadogAPIError(f"spans aggregate ({query}): expected a list in 'data', "
+                              f"got {type(data).__name__}")
+    return [b.get("attributes") or {} for b in data]
 
 
 def fetch_resources(cfg: Config) -> list[dict[str, Any]]:
@@ -139,7 +145,7 @@ def fetch_resources(cfg: Config) -> list[dict[str, Any]]:
     return [
         {
             "resource": str(b.get("by", {}).get("resource_name", "")),
-            "hits": int((b.get("computes") or {}).get("c0") or 0),
+            "hits": int((b.get("compute") or {}).get("c0") or 0),
         }
         for b in buckets
         if b.get("by", {}).get("resource_name")

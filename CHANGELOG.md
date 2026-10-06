@@ -27,4 +27,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - L2 components are labelled for what APM sees: HTTP route groups have the technology `HTTP endpoint group`, other resources `Entry point`, and the L2 view description says they are entry points, not code structure.
 - `examples/github-actions/c4.yml`: a workflow that rebuilds the model from committed `raw/` responses on pull requests and validates it with the `structurizr/structurizr` image, and fetches fresh data on a manual or weekly run. The README shows how to view the output with Structurizr local and validate it with Docker.
 - `Dockerfile`: an image with the tool and no renderers, on a base image pinned by digest, running as a non-root user. CI builds it and runs the example offline in it; it is not published yet.
+- Span aggregate responses are read in the shape the live API returns (`data[].attributes.by` and `attributes.compute`); a response in any other shape stops the run instead of being read as empty. Checked against a live Datadog account.
+- `.env` is read from the current directory only. Before, an editable install also found the repository's `.env` by searching upwards from the package folder.
 - `examples/checkout-web/`: a `c4.toml` and saved responses for a web service and its worker.
