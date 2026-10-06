@@ -54,6 +54,12 @@ jobs:
             docker run --rm -v "$RUNNER_TEMP/c4:/usr/local/structurizr" "$IMAGE" \
               validate -workspace "/usr/local/structurizr/$f"
           done
+      - name: TEMP print export help
+        run: |
+          for args in "export --help" "export -h" "help export" "export" "--help"; do
+            echo "===== $args"
+            docker run --rm "$IMAGE" $args 2>&1 | head -60 || true
+          done
       - name: A dangling identifier fails validation, for that reason
         run: |
           sed -i 's|-> \(cart_service\) "Calls"|-> renamed_service "Calls"|' "$RUNNER_TEMP/c4/workspace.dsl"

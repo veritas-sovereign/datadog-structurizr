@@ -136,3 +136,11 @@ def test_dotenv_read_from_current_directory_only(tmp_path, monkeypatch):
     monkeypatch.delenv("DD_ENV")
     with pytest.raises(SystemExit, match="DD_SERVICE"):
         load_config({"OFFLINE": "1", "OUTPUT_DIR": str(tmp_path / "o")})
+
+
+@pytest.mark.parametrize("given", ["datadoghq.eu", "api.datadoghq.eu", "https://api.datadoghq.eu/",
+                                   "https://app.datadoghq.eu", " DATADOGHQ.EU "])
+def test_site_normalized(tmp_path, monkeypatch, given):
+    monkeypatch.setenv("DD_SITE", given)
+    cfg = load_config({"OFFLINE": "1", "OUTPUT_DIR": str(tmp_path / "o"), "DD_SERVICE": "w", "DD_ENV": "p"})
+    assert cfg.site == "datadoghq.eu"

@@ -91,6 +91,16 @@ def read_config_file(path: Path) -> dict[str, Any]:
     return data
 
 
+def normalize_site(site: str) -> str:
+    """The Datadog site as the tool expects it ("datadoghq.eu"), from forms people
+    copy from the browser or the API docs: "https://api.datadoghq.eu/" or
+    "api.datadoghq.eu". The tool adds "https://api." itself."""
+    site = site.strip().lower()
+    for prefix in ("https://", "http://", "api.", "app."):
+        site = site.removeprefix(prefix)
+    return site.rstrip("/")
+
+
 def load_config(overrides: dict[str, Any] | None = None,
                 config_file: Path | None = None,
                 prompt: Callable[[str], str] | None = None) -> Config:
@@ -151,7 +161,7 @@ def load_config(overrides: dict[str, Any] | None = None,
     return Config(
         api_key=api_key,
         app_key=app_key,
-        site=get("DD_SITE", file.get("site"), "DD_SITE", "datadoghq.com"),
+        site=normalize_site(get("DD_SITE", file.get("site"), "DD_SITE", "datadoghq.com")),
         service=service,
         env=env,
         lookback_hours=int(get("DD_LOOKBACK_HOURS", file.get("hours"), "DD_LOOKBACK_HOURS", 24)),
