@@ -25,7 +25,8 @@ def test_dsl_defines_three_views_without_remote_theme(offline_cfg):
     dsl = emit_dsl_views(_model(offline_cfg))
     assert 'systemContext checkout_web_system "L0-SystemContext"' in dsl
     assert 'container checkout_web_system "L1-Containers"' in dsl
-    assert 'component checkout_web "L2-Components"' in dsl
+    assert 'component checkout_web "L2-Components" "Entry points of checkout-web' in dsl
+    assert "not its code structure" in dsl
     assert "theme" not in dsl
 
 

@@ -19,8 +19,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   - `--system-name` / `[system] name` and `description`.
   - `[classify] datastores`, `external` and `internal`: fnmatch patterns that override the name hints.
   - `ignore`: fnmatch patterns for services left out of every view.
-  - `--no-person` / `[person] enabled`, `name` and `description`. Without a person, the services calling the target call its HTTP components.
+  - `--no-person` / `[person] enabled`, `name` and `description`. Without a person, the services calling the target call its HTTP endpoint groups.
 - Settings precedence: flags, then the config file, then environment variables and `.env`. Datadog keys are only read from the environment and are refused in the config file. Unknown config keys and wrong types stop the run.
 - On a terminal, a missing service or environment is asked for. `--no-input` turns this off. Nothing is asked in CI.
 - Failed Datadog calls stop the run with exit status 1, and no diagrams are written. Only a 404 from the service definition endpoint is accepted, since that means the service has no definition. The spans query without the `span.kind` filter is only sent when the filtered query succeeds with no results, never after a failed call.
+- `[components] max` sets how many components L2 shows (default 12).
+- L2 components are labelled for what APM sees: HTTP route groups have the technology `HTTP endpoint group`, other resources `Entry point`, and the L2 view description says they are entry points, not code structure.
 - `examples/checkout-web/`: a `c4.toml` and saved responses for a web service and its worker.

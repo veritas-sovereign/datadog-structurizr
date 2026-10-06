@@ -71,6 +71,13 @@ def test_person_can_be_turned_off_from_file_or_cli(tmp_path):
     assert not load_config({**common, "DD_SERVICE": "w", "DD_ENV": "p", "NO_PERSON": "1"}).person_enabled
 
 
+def test_component_cap_from_file(tmp_path):
+    path = _write(tmp_path, 'service = "web"\nenv = "prod"\n[components]\nmax = 4\n')
+    assert load_config({"OFFLINE": "1", "OUTPUT_DIR": str(tmp_path / "o")}, config_file=path).max_components == 4
+    assert load_config({"OFFLINE": "1", "OUTPUT_DIR": str(tmp_path / "o"),
+                        "DD_SERVICE": "w", "DD_ENV": "p"}).max_components == 12
+
+
 @pytest.mark.parametrize("text, message", [
     ('servce = "web"', "unknown key 'servce'"),
     ('[system]\nnmae = "x"', "unknown key 'nmae'"),
@@ -81,6 +88,8 @@ def test_person_can_be_turned_off_from_file_or_cli(tmp_path):
     ('[person]\nenabled = "no"', "must be bool"),
     ('system = "x"', "must be a table"),
     ('service = ', "invalid TOML"),
+    ('[components]\nmax = "12"', "must be int"),
+    ('[components]\nmax = 1', "at least 2"),
 ])
 def test_config_file_errors(tmp_path, text, message):
     with pytest.raises(SystemExit, match=message):

@@ -1,4 +1,6 @@
-from datadog_structurizr.mapper import MAX_COMPONENTS, _group_resources, build_model
+from datadog_structurizr.mapper import ENTRY_POINT, HTTP_GROUP, _group_resources, build_model
+
+MAX_COMPONENTS = 12
 
 
 def _model(cfg, calls=(), called_by=(), resources=()):
@@ -62,9 +64,22 @@ def test_components_capped_with_other_bucket():
     assert groups[-1][3] == sum(100 - i for i in range(MAX_COMPONENTS - 1, MAX_COMPONENTS + 5))
 
 
+def test_component_cap_is_configurable(offline_cfg):
+    import dataclasses
+    cfg = dataclasses.replace(offline_cfg, max_components=3)
+    m = _model(cfg, resources=[(f"GET /r{i}", 10 - i) for i in range(6)])
+    names = [c.name for c in m.target_container.children]
+    assert names == ["R0 API", "R1 API", "Other"]
+
+
+def test_components_labelled_as_endpoint_groups_and_entry_points(offline_cfg):
+    m = _model(offline_cfg, resources=[("order.created consume", 10), ("GET /cart", 5)])
+    assert sorted(c.technology for c in m.target_container.children) == [ENTRY_POINT, HTTP_GROUP]
+
+
 def test_non_http_handlers_have_no_user_edge(offline_cfg):
     m = _model(offline_cfg, resources=[("order.created consume", 10), ("GET /cart", 5)])
-    handler = next(c for c in m.target_container.children if c.technology == "Handler")
+    handler = next(c for c in m.target_container.children if c.technology == ENTRY_POINT)
     assert not any(r.target_key == handler.key for r in m.relationships)
 
 

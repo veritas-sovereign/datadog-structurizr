@@ -31,13 +31,15 @@
 
 `datadog-structurizr` reads one service's topology from Datadog APM and writes three C4 views of it:
 
-| Level | C4 view | Shows | Built from |
-| --- | --- | --- | --- |
-| L0 | System Context | the user, the software system containing the service, the services it calls and is called by | service dependencies |
-| L1 | Container | the service, the other services you name as part of the system, and their datastores inside the system boundary, with the neighbouring systems | service dependencies |
-| L2 | Component | the service's entry points (HTTP route groups and handlers) | span resources |
+| Here | C4 model | C4 view | Shows | Built from |
+| --- | --- | --- | --- | --- |
+| L0 | Level 1 | System Context | the user, the software system containing the service, the services it calls and is called by | service dependencies |
+| L1 | Level 2 | Container | the service, the other services you name as part of the system, and their datastores inside the system boundary, with the neighbouring systems | service dependencies |
+| L2 | Level 3 | Component | the service's entry points: HTTP endpoint groups and handlers | span resources |
 
-C4 numbers these views 1, 2 and 3. This project names them L0, L1 and L2.
+The [C4 model](https://c4model.com/) numbers these views 1, 2 and 3. This project names them L0, L1 and L2, as do the view names and file names it writes.
+
+L2 shows the API surface that APM sees, not the code structure behind it. Treat its components as a first draft of the service's entry points, not as its controllers, services and repositories.
 
 Each run writes:
 
@@ -191,6 +193,9 @@ description = "Buys products on the web shop."
 datastores = ["ledger"]
 external = []
 internal = []
+
+[components]
+max = 12
 ```
 
 | Key | Type | Meaning |
@@ -205,6 +210,7 @@ internal = []
 | `[person] enabled` | boolean | draw a person (default `true`) |
 | `[person] name`, `description` | string | the person (default `User`) |
 | `[classify] datastores`, `external`, `internal` | list | force a dependency into a group, overriding the name hints |
+| `[components] max` | integer | most components shown in L2, the last being `Other` (default 12, at least 2) |
 
 `ignore` and the `[classify]` lists accept `fnmatch` patterns (`*`, `?`, `[abc]`) and ignore case. Top-level keys such as `ignore` must come before the first `[table]`, as TOML requires. Unknown keys and wrong types stop the run with an error naming the key, so a typo cannot be silently ignored. Datadog keys are refused in the config file.
 
@@ -298,6 +304,7 @@ When a call fails, the run prints the HTTP status, the call and Datadog's messag
 - The service dependencies endpoint is in public beta.
 - Span aggregates only cover **indexed** spans (those kept by retention filters). The span counts on components show relative traffic, not total requests.
 - Span aggregates are limited to 300 requests per hour. A run makes one or two of these requests.
+- Span aggregates return the **100** resource names with the most spans. Resources beyond those are not fetched and do not appear in L2, not even in `Other`. They are the least-used ones.
 
 ## Mapping conventions
 
@@ -324,11 +331,11 @@ A service that calls itself gets no relationship. Relationships between containe
 
 ### Components
 
-- HTTP resources such as `GET /api/v1/cart/{id}` are grouped by their first path segment after `api`, version segments (`v1`, `v2`), and ids. `GET /api/v1/cart/{id}` and `POST /api/v1/cart/items` both go into `Cart API`.
-- Other resources, such as queue consumers and jobs, each become one `Handler` component.
+- HTTP resources such as `GET /api/v1/cart/{id}` are grouped by their first path segment after `api`, version segments (`v1`, `v2`), and ids. `GET /api/v1/cart/{id}` and `POST /api/v1/cart/items` both go into `Cart API`, with the technology `HTTP endpoint group`.
+- Other resources, such as queue consumers and jobs, each become one component with the technology `Entry point`.
 - Probe endpoints (`/health`, `/healthz`, `/ready`, `/readyz`, `/live`, `/livez`, `/ping`, `/metrics`) are dropped.
-- Components are sorted by span count. At most 12 are shown, and the rest are combined into `Other`.
-- The person calls each HTTP component. Without a person, the services that call the target service do. Handlers get no incoming relationship.
+- Components are sorted by span count. At most 12 are shown, and the rest are combined into `Other`. Change the number with `[components] max`.
+- The person calls each HTTP endpoint group. Without a person, the services that call the target service do. Entry points get no incoming relationship.
 - Components are only built for the target service, not for included services. Run the tool again with an included service as `service` to get its components.
 
 ### Identifiers

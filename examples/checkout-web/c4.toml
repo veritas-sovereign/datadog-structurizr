@@ -27,3 +27,7 @@ description = "Buys products on the web shop."
 datastores = ["ledger"]
 external = []
 internal = []
+
+# Most components shown in L2; the last one collects the rest as "Other".
+[components]
+max = 12

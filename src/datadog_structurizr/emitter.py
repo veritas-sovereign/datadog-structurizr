@@ -66,7 +66,9 @@ def emit_dsl_views(model: C4Model) -> str:
     w("    include *")
     w("    autolayout lr")
     w("}")
-    w(f'component {model.target_container.key} "L2-Components" {{')
+    w(f'component {model.target_container.key} "L2-Components" '
+      + _q(f"Entry points of {model.target_container.name} seen in Datadog APM "
+           "(HTTP endpoint groups and handlers), not its code structure.") + " {")
     w("    include *")
     w("    autolayout lr")
     w("}")
@@ -189,7 +191,7 @@ def emit_mermaid(model: C4Model) -> dict[str, str]:
     comp_keys = {x.key for x in c.children}
     related = {k for r in model.relationships for k in (r.source_key, r.target_key)
                if r.source_key in comp_keys or r.target_key in comp_keys} - comp_keys
-    l2 = ["C4Component", f"    title L2 Components - {c.name}"]
+    l2 = ["C4Component", f"    title L2 Components - {c.name} (entry points seen in APM)"]
     if person_keys & related:
         l2 += person_line
     l2.append(f"    Container_Boundary({c.key}, {_m(c.name)}) {{")

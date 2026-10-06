@@ -5,8 +5,11 @@ Mapping rules:
   - Datastore-looking dependencies are containers inside that system (owned data).
   - SaaS / cloud-API-looking dependencies are external software systems.
   - Every other neighbouring service is an internal software system.
-  - Components are the target's entry-point resources (span resource_name),
-    HTTP routes grouped by their first meaningful path segment.
+  - Components are the target's entry points (span resource_name): HTTP
+    routes grouped by their first meaningful path segment, and other
+    resources such as consumers and jobs one each. They are labelled as
+    endpoint groups and entry points, because APM sees the API surface, not
+    the code structure behind it.
 
 Classification is name-based heuristics; use [classify] in the config file or
 the hint tuples below when they guess wrong.
@@ -31,7 +34,8 @@ DATASTORE_HINTS = (
     "dynamodb", "elasticsearch", "opensearch", "clickhouse", "sqlserver",
     "oracle", "db", "kafka", "rabbitmq",
 )
-MAX_COMPONENTS = 12
+HTTP_GROUP = "HTTP endpoint group"
+ENTRY_POINT = "Entry point"
 # Probe endpoints are not architecture; drop them from L2.
 _PROBE_RE = re.compile(r"/(health|healthz|healthcheck|ready|readyz|live|livez|ping|metrics)/?$",
                        re.IGNORECASE)
@@ -61,7 +65,8 @@ def _definition_attrs(definition: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _group_resources(resources: list[dict[str, Any]]) -> list[tuple[str, str, list[str], int]]:
+def _group_resources(resources: list[dict[str, Any]],
+                     max_components: int = 12) -> list[tuple[str, str, list[str], int]]:
     """Return [(component name, technology, sample resources, hits)] sorted by hits."""
     groups: dict[tuple[str, str], list[tuple[str, int]]] = defaultdict(list)
     for r in resources:
@@ -72,17 +77,17 @@ def _group_resources(resources: list[dict[str, Any]]) -> list[tuple[str, str, li
         if m:
             segments = [s for s in m.group(2).split("/") if s and not _NOISE_SEGMENT.match(s)]
             name = f"{segments[0].title() if segments else 'Root'} API"
-            groups[(name, "HTTP")].append((res, hits))
+            groups[(name, HTTP_GROUP)].append((res, hits))
         else:
-            groups[(res[:40], "Handler")].append((res, hits))
+            groups[(res[:40], ENTRY_POINT)].append((res, hits))
 
     ranked = sorted(
         ((name, tech, [r for r, _ in items], sum(h for _, h in items))
          for (name, tech), items in groups.items()),
         key=lambda g: g[3], reverse=True,
     )
-    if len(ranked) > MAX_COMPONENTS:
-        head, tail = ranked[:MAX_COMPONENTS - 1], ranked[MAX_COMPONENTS - 1:]
+    if len(ranked) > max_components:
+        head, tail = ranked[:max_components - 1], ranked[max_components - 1:]
         head.append(("Other", "mixed",
                      [r for g in tail for r in g[2]], sum(g[3] for g in tail)))
         ranked = head
@@ -186,7 +191,7 @@ def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
     # person or, without one, by the services observed calling the target.
     callers = ([person.key] if person else
                [r.source_key for r in model.relationships if r.target_key == container.key])
-    groups = _group_resources(resources)
+    groups = _group_resources(resources, cfg.max_components)
     if not groups:
         groups = [("Request Handlers", "unknown",
                    ["No indexed spans found - refine by hand."], 0)]
@@ -196,7 +201,7 @@ def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
                        f"{shown}" + (f" - {hits} spans" if hits else ""),
                        technology=comp_tech, parent_key=container.key)
         container.children.append(comp)
-        if comp_tech == "HTTP":
+        if comp_tech == HTTP_GROUP:
             for caller in callers:
                 model.relate(caller, comp.key, "Calls", "HTTPS")
 

@@ -26,6 +26,7 @@ _FILE_SCHEMA: dict[str, Any] = {
     "system": {"name": str, "description": str, "include": list},
     "person": {"enabled": bool, "name": str, "description": str},
     "classify": {"datastores": list, "external": list, "internal": list},
+    "components": {"max": int},
 }
 _SECRET_KEYS = {"api_key", "app_key", "dd_api_key", "dd_app_key", "api-key", "app-key"}
 
@@ -51,6 +52,7 @@ class Config:
     person_enabled: bool = True
     person_name: str = "User"
     person_description: str = "End user of the web component."
+    max_components: int = 12  # L2 keeps this many, the last one being "Other"
     source_file: Optional[Path] = field(default=None, compare=False)
 
     @property
@@ -100,6 +102,9 @@ def load_config(overrides: dict[str, Any] | None = None,
     cli = {k: v for k, v in (overrides or {}).items() if v not in (None, "", ())}
     file = read_config_file(config_file) if config_file else {}
     system, person, classify = file.get("system", {}), file.get("person", {}), file.get("classify", {})
+    max_components = file.get("components", {}).get("max", 12)
+    if max_components < 2:
+        raise SystemExit(f"{config_file}: [components] 'max' must be at least 2.")
 
     def get(cli_key: str, file_value: Any, env_key: str | None, default: Any = None) -> Any:
         if cli_key in cli:
@@ -153,5 +158,6 @@ def load_config(overrides: dict[str, Any] | None = None,
         person_enabled="NO_PERSON" not in cli and person.get("enabled", True),
         person_name=person.get("name", "User"),
         person_description=person.get("description", "End user of the web component."),
+        max_components=max_components,
         source_file=config_file,
     )
