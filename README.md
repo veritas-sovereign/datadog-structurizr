@@ -303,11 +303,11 @@ output/
 | Renderer | Used when | Output |
 | --- | --- | --- |
 | [`mmdc`](https://github.com/mermaid-js/mermaid-cli) | on `PATH` | `L0-SystemContext.svg`, `L1-Containers.svg`, `L2-Components.svg` |
-| [structurizr-cli](https://docs.structurizr.com/cli) + [PlantUML](https://plantuml.com/) | both on `PATH` | `plantuml/*.puml` and `plantuml/*.svg` |
+| [structurizr-cli](https://docs.structurizr.com/cli) + [PlantUML](https://plantuml.com/) (legacy) | both on `PATH` | `plantuml/*.puml` and `plantuml/*.svg` |
 
 When neither is installed, only the sources are written. The generated workspace sets no theme, so structurizr-cli needs no network access to read it.
 
-structurizr-cli is end of life; it still works when installed. Its replacement is the `export` command of the `structurizr/structurizr` image, which takes the same options. It writes PlantUML or Mermaid sources from `workspace.dsl`, so unlike the tool's own `.mmd` files they include your hand edits:
+structurizr-cli is end of life and kept only for setups that already have it. For PlantUML or Mermaid from the workspace, use the `export` command of the `structurizr/structurizr` image instead; it takes the same options. It writes PlantUML or Mermaid sources from `workspace.dsl`, so unlike the tool's own `.mmd` files they include your hand edits:
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/output:/usr/local/structurizr" structurizr/structurizr \
@@ -368,13 +368,13 @@ Each dependency name is checked against these rules in order. The first rule tha
 | matches `[classify] internal` | internal software system | L0, L1 |
 | its own spans' most common type is a datastore type: `sql`, `redis`, `valkey`, `elasticsearch`, `opensearch`, `dynamodb`, `mongodb`, `cosmosdb` | database container inside the target system, with that type as its technology | L1 |
 | its own spans' most common type is a service type: `web`, `http`, `rpc`, `soap`, `serverless` | external system if the name matches `EXTERNAL_HINTS`, otherwise internal system; the datastore name hints are skipped | L0, L1 |
-| name matches `DATASTORE_HINTS` (`postgres`, `redis`, `kafka`, a `db` token, ...) | database container inside the target system | L1 |
-| name matches `EXTERNAL_HINTS` (`stripe`, `aws.`, `s3`, `twilio`, ...) | external software system, shown in grey | L0, L1 |
+| name matches `DATASTORE_HINTS` (`postgres`, `kafka`, a `redis` or `db` token, ...) | database container inside the target system | L1 |
+| name matches `EXTERNAL_HINTS` (`stripe`, `aws.`, `twilio`, an `s3` token, ...) | external software system, shown in grey | L0, L1 |
 | any other service | internal software system | L0, L1 |
 
 The span types come from one spans aggregate over the neighbouring services, grouped by service and then by `type`; spans with no type are not counted. The two type lists are the values seen on a live account, so a type outside them (for example `queue` or `custom`) leaves the decision to the name hints. A span type cannot tell an external service from an internal one.
 
-The hints are matched case-insensitively, and `db` must be a whole word, so `feedback-service` is not a datastore. The hint lists are in [`mapper.py`](src/datadog_structurizr/mapper.py). Use `[classify]` rather than editing them.
+The hints are matched case-insensitively. The short or common-word hints `db`, `redis`, `mongo`, `mongodb`, `oracle`, `s3`, `sqs`, `sns` and `segment` must be a whole token of the name, separated by anything but letters and digits (`-`, `_`, `.`), so `feedback-service`, `redistribution-svc`, `user-segments-api` and `transactions3` match none of them, while `orders-db`, `redis-cache` and `events-sqs` do. The other hints, such as `stripe`, `salesforce`, `postgres`, `elasticsearch` and `aws.`, are distinctive enough to match anywhere in the name. The hint lists are in [`mapper.py`](src/datadog_structurizr/mapper.py). Use `[classify]` rather than editing them.
 
 Each dependency records the rule that placed it, as a `Classified by` property in `datadog-model.dsl`: for example `[classify] datastores pattern ledger`, `span type redis`, `span type http and name hint stripe`, `name hint db`, or `no span type or name hint matched`. Included services have `[system] include`. Structurizr shows properties in its element details; they are not drawn, and the Mermaid files leave them out. When a dependency is in the wrong group, the property says whether to fix it with `[classify]` or whether Datadog recorded an unexpected span type.
 

@@ -24,6 +24,38 @@ def test_db_hint_matches_whole_token_only(offline_cfg):
     assert [s.name for s in m.systems] == ["feedback-service"]
 
 
+SHORT_HINT_LOOKALIKES = ["user-segments-api", "jobs3-worker", "transactions3", "tsqs", "sqsworker",
+                         "redistribution-svc", "mongoose-api"]
+
+
+def test_short_hints_match_whole_tokens_only(offline_cfg):
+    m = _model(offline_cfg, calls=SHORT_HINT_LOOKALIKES)
+    assert {s.name: (s.external, s.basis) for s in m.systems} == {
+        name: (False, "no span type or name hint matched") for name in SHORT_HINT_LOOKALIKES}
+    assert not [c for c in m.target_system.children if c.database]
+
+
+def test_short_hint_lookalikes_with_a_service_type_stay_internal(offline_cfg):
+    m = build_model({"calls": SHORT_HINT_LOOKALIKES}, [], {}, offline_cfg,
+                    types={name: {"http": 10} for name in SHORT_HINT_LOOKALIKES})
+    assert {s.name: (s.external, s.basis) for s in m.systems} == {
+        name: (False, "span type http") for name in SHORT_HINT_LOOKALIKES}
+
+
+def test_short_hints_still_match_as_tokens(offline_cfg):
+    m = _model(offline_cfg, calls=["mongodb", "mongodb-orders", "redis-cache", "orders-db", "oracle-ledger",
+                                   "s3-bucket", "events-sqs", "alerts.sns", "segment-io",
+                                   "stripe-api", "salesforce-sync", "postgresql-main"])
+    assert {c.name: c.basis for c in m.target_system.children if c.database} == {
+        "mongodb": "name hint mongodb", "mongodb-orders": "name hint mongodb",
+        "redis-cache": "name hint redis", "orders-db": "name hint db", "oracle-ledger": "name hint oracle",
+        "postgresql-main": "name hint postgres"}
+    assert {s.name: s.basis for s in m.systems if s.external} == {
+        "s3-bucket": "name hint s3", "events-sqs": "name hint sqs", "alerts.sns": "name hint sns",
+        "segment-io": "name hint segment", "stripe-api": "name hint stripe",
+        "salesforce-sync": "name hint salesforce"}
+
+
 def test_upstream_and_downstream_relationships(offline_cfg):
     m = _model(offline_cfg, calls=["cart-service"], called_by=["api-gateway"])
     pairs = {(r.source_key, r.target_key) for r in m.relationships}
