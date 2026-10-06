@@ -120,3 +120,16 @@ def test_no_prompt_when_values_given(tmp_path):
 
     load_config({"DD_SERVICE": "w", "DD_ENV": "p", "OFFLINE": "1", "OUTPUT_DIR": str(tmp_path / "o")},
                 prompt=prompt)
+
+
+def test_dotenv_read_from_current_directory_only(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text("DD_SERVICE=from-cwd\nDD_ENV=e\n")
+    cfg = load_config({"OFFLINE": "1", "OUTPUT_DIR": str(tmp_path / "o")})
+    assert cfg.service == "from-cwd"
+    sub = tmp_path / "sub"
+    sub.mkdir()
+    monkeypatch.chdir(sub)
+    monkeypatch.delenv("DD_SERVICE")
+    monkeypatch.delenv("DD_ENV")
+    with pytest.raises(SystemExit, match="DD_SERVICE"):
+        load_config({"OFFLINE": "1", "OUTPUT_DIR": str(tmp_path / "o")})

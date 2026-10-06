@@ -338,8 +338,8 @@ When a call fails, the run prints the HTTP status, the call and Datadog's messag
 
 - The service dependencies endpoint is in public beta.
 - Span aggregates only cover **indexed** spans (those kept by retention filters). The span counts on components show relative traffic, not total requests.
-- Span aggregates are limited to 300 requests per hour. A run makes one or two of these requests.
-- Span aggregates return the **100** resource names with the most spans. Resources beyond those are not fetched and do not appear in L2, not even in `Other`. They are the least-used ones.
+- Span aggregates were limited to 50 requests per 60 seconds when measured on a live account (the `x-ratelimit-*` response headers), and that allowance is shared with everything else in the organisation that queries spans. A run makes one or two of these requests. When it is used up, Datadog answers 429 and the run stops.
+- Span aggregates return the **100** resource names with the most spans. Resources beyond those are not fetched and do not appear in L2, not even in `Other`. They are the least-used ones. The response has no cursor for the next page, so there is no way to fetch more.
 
 ## Mapping conventions
 

@@ -16,6 +16,34 @@ class FakeResponse:
         return self._body
 
 
+def bucket(by, count):
+    """One bucket as the live spans aggregate API returns it."""
+    return {"type": "bucket", "id": "b", "attributes": {"by": by, "compute": {"c0": count}}}
+
+
+def test_resources_parse_live_response_shape(monkeypatch, online_cfg):
+    live = {"data": [bucket({"resource_name": "GET /api/v1/cart/{id}"}, 1200),
+                     bucket({"resource_name": "POST"}, 300)],
+            "meta": {"elapsed": 100, "status": "done", "traffic_type": "sampled"}}
+    monkeypatch.setattr(client.requests, "post", lambda *a, **k: FakeResponse(200, live))
+    assert client.fetch_resources(online_cfg) == [
+        {"resource": "GET /api/v1/cart/{id}", "hits": 1200}, {"resource": "POST", "hits": 300}]
+
+
+def test_resources_unexpected_shape_raises(monkeypatch, online_cfg):
+    old_shape = {"data": {"buckets": [{"by": {"resource_name": "GET /cart"}, "computes": {"c0": 7}}]}}
+    monkeypatch.setattr(client.requests, "post", lambda *a, **k: FakeResponse(200, old_shape))
+    with pytest.raises(client.DatadogAPIError, match="expected a list"):
+        client.fetch_resources(online_cfg)
+
+
+def test_dependencies_without_called_by(monkeypatch, online_cfg):
+    # The live API leaves out called_by when nothing calls the service.
+    monkeypatch.setattr(client.requests, "get",
+                        lambda *a, **k: FakeResponse(200, {"name": "checkout-web", "calls": ["redis"]}))
+    assert client.fetch_service_dependencies(online_cfg) == {"name": "checkout-web", "calls": ["redis"]}
+
+
 def test_dependencies_request(monkeypatch, online_cfg):
     seen = {}
 
@@ -45,11 +73,11 @@ def test_resources_fall_back_when_span_kind_unset(monkeypatch, online_cfg):
         query = json["data"]["attributes"]["filter"]["query"]
         queries.append(query)
         if "span.kind" in query:
-            return FakeResponse(200, {"data": {"buckets": []}})
-        return FakeResponse(200, {"data": {"buckets": [
-            {"by": {"resource_name": "GET /cart"}, "computes": {"c0": 7}},
-            {"by": {}, "computes": {"c0": 1}},
-        ]}})
+            return FakeResponse(200, {"data": [], "meta": {"status": "done"}})
+        return FakeResponse(200, {"data": [
+            bucket({"resource_name": "GET /cart"}, 7),
+            bucket({}, 1),
+        ], "meta": {"status": "done"}})
 
     monkeypatch.setattr(client.requests, "post", fake_post)
     assert client.fetch_resources(online_cfg) == [{"resource": "GET /cart", "hits": 7}]
@@ -101,8 +129,7 @@ def fake_datadog(monkeypatch, definition_status=200, spans_status=200):
 
     def fake_post(url, headers, json, timeout):
         urls.append(url)
-        return FakeResponse(spans_status, {"data": {"buckets": [
-            {"by": {"resource_name": "GET /cart"}, "computes": {"c0": 7}}]}})
+        return FakeResponse(spans_status, {"data": [bucket({"resource_name": "GET /cart"}, 7)]})
 
     monkeypatch.setattr(client.requests, "get", fake_get)
     monkeypatch.setattr(client.requests, "post", fake_post)

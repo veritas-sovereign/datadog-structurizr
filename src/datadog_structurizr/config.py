@@ -98,7 +98,9 @@ def load_config(overrides: dict[str, Any] | None = None,
     overrides: command-line values (None means not given).
     prompt: asks for a missing service or env; pass None to never prompt.
     """
-    load_dotenv()
+    # Only ./.env: without a path, load_dotenv searches upwards from this
+    # module's folder, so an editable install would read the repository's .env.
+    load_dotenv(Path.cwd() / ".env")
     cli = {k: v for k, v in (overrides or {}).items() if v not in (None, "", ())}
     file = read_config_file(config_file) if config_file else {}
     system, person, classify = file.get("system", {}), file.get("person", {}), file.get("classify", {})
