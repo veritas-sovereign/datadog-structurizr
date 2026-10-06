@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-06
+
 ### Changed
 
 - The short or common-word name hints (`db`, `redis`, `mongo`, `mongodb`, `oracle`, `s3`, `sqs`, `sns`, `segment`) match only a whole token of the name. They matched anywhere, so `redistribution-svc` became a Redis datastore, `transactions3` an S3 external system, and `user-segments-api` an external Segment system even when its span type said it was a service. Dependencies whose names contained one of these hints inside a longer word can now be classified differently; use `[classify]` to keep the old group. `mongodb` is a hint of its own, so `mongodb-orders` is still a datastore.
@@ -60,6 +62,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The README documents exporting PlantUML or Mermaid with the `structurizr/structurizr` image, which replaces the end-of-life structurizr-cli; CI checks the documented command writes all three views.
 - `examples/checkout-web/`: a `c4.toml` and saved responses for a web service and its worker.
 
-[Unreleased]: https://github.com/veritas-sovereign/datadog-structurizr/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/veritas-sovereign/datadog-structurizr/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/veritas-sovereign/datadog-structurizr/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/veritas-sovereign/datadog-structurizr/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/veritas-sovereign/datadog-structurizr/releases/tag/v0.1.0

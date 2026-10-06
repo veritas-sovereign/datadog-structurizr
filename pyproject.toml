@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "datadog-structurizr"
-version = "0.2.0"
+version = "0.3.0"
 description = "Generate C4 system context, container and component diagrams of a Datadog APM service as Structurizr DSL and Mermaid."
 readme = "README.md"
 license = "MIT"
