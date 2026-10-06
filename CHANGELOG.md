@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-06
+
 ### Added
 
 - `--no-raw`: draw the diagrams without saving the Datadog responses to `raw/`, where they must not be stored.
@@ -12,8 +14,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
-- The README's Limitations section lists what Datadog data establishes and what it does not, such as the system boundary or the absence of a call.
 - Python 3.10 or later is required. Python 3.9 reached end of life in October 2025.
+- The README's Limitations section lists what Datadog data establishes and what it does not, such as the system boundary or the absence of a call.
 - CI runs `ruff check` and `pyright`; both are in the `dev` extra.
 
 ### Fixed
@@ -53,5 +55,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The README documents exporting PlantUML or Mermaid with the `structurizr/structurizr` image, which replaces the end-of-life structurizr-cli; CI checks the documented command writes all three views.
 - `examples/checkout-web/`: a `c4.toml` and saved responses for a web service and its worker.
 
-[Unreleased]: https://github.com/veritas-sovereign/datadog-structurizr/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/veritas-sovereign/datadog-structurizr/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/veritas-sovereign/datadog-structurizr/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/veritas-sovereign/datadog-structurizr/releases/tag/v0.1.0

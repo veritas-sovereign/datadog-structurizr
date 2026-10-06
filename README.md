@@ -92,7 +92,7 @@ You also need a Datadog API key and application key. See [Datadog access](#datad
 ```bash
 python3 -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install datadog-structurizr                         # latest release
-pip install datadog-structurizr==0.1.0                  # or a specific version
+pip install datadog-structurizr==0.2.0                  # or a specific version
 datadog-structurizr --help
 ```
 
@@ -134,14 +134,14 @@ To use the code without installing it, run `pip install -r requirements.txt` and
 
 ### Docker
 
-Each release publishes an image with the tool and no renderers to `ghcr.io/veritas-sovereign/datadog-structurizr`, for amd64 and arm64, tagged with the version (`0.1.0`) and the minor version (`0.1`). It is built from the [`Dockerfile`](Dockerfile); `docker build -t datadog-structurizr .` builds the same image from a clone.
+Each release publishes an image with the tool and no renderers to `ghcr.io/veritas-sovereign/datadog-structurizr`, for amd64 and arm64, tagged with the version (`0.2.0`) and the minor version (`0.2`). It is built from the [`Dockerfile`](Dockerfile); `docker build -t datadog-structurizr .` builds the same image from a clone.
 
 Run it in the folder that holds `c4.toml`. `--user` makes the output files yours, and the keys come from the environment:
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" \
   -e DD_API_KEY -e DD_APP_KEY \
-  ghcr.io/veritas-sovereign/datadog-structurizr:0.1.0 -c c4.toml -o . --no-render
+  ghcr.io/veritas-sovereign/datadog-structurizr:0.2.0 -c c4.toml -o . --no-render
 ```
 
 The image has no `mmdc` or structurizr-cli, so use `--no-render`, and [view](#viewing-locally) or validate the output with the `structurizr/structurizr` image.

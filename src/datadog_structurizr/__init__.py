@@ -1,3 +1,3 @@
 """Generate C4 diagrams of a Datadog APM service as Structurizr DSL and Mermaid."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
