@@ -11,8 +11,8 @@ Mapping rules:
     endpoint groups and entry points, because APM sees the API surface, not
     the code structure behind it.
 
-Classification is name-based heuristics; use [classify] in the config file or
-the hint tuples below when they guess wrong.
+Classification: [classify] in the config file, then the span type of the
+dependency's own spans, then the name hints below.
 """
 from __future__ import annotations
 
@@ -34,6 +34,13 @@ DATASTORE_HINTS = (
     "dynamodb", "elasticsearch", "opensearch", "clickhouse", "sqlserver",
     "oracle", "db", "kafka", "rabbitmq",
 )
+# Span types (the `type` of a service's own spans) seen on a live account.
+# A dependency whose most common type is one of these is a datastore; one whose
+# most common type is a service type is not, whatever its name suggests. Any
+# other type, or none, leaves the decision to the name hints.
+DATASTORE_TYPES = frozenset({"sql", "redis", "valkey", "elasticsearch", "opensearch",
+                             "dynamodb", "mongodb", "cosmosdb"})
+SERVICE_TYPES = frozenset({"web", "http", "rpc", "soap", "serverless"})
 HTTP_GROUP = "HTTP endpoint group"
 ENTRY_POINT = "Entry point"
 UNROUTED = "Unrouted HTTP"
@@ -133,16 +140,25 @@ def _container_meta(meta: dict[str, Any]) -> tuple[str, str]:
             ", ".join(meta["languages"]) or "APM service")
 
 
+def _span_type(counts: dict[str, int] | None) -> str:
+    """The most common non-empty span type, or "" when there is none."""
+    typed = {t: n for t, n in (counts or {}).items() if t}
+    return max(sorted(typed), key=typed.__getitem__) if typed else ""
+
+
 def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
                 definition: dict[str, Any], cfg: Config,
-                member_deps: dict[str, dict[str, Any]] | None = None) -> C4Model:
+                member_deps: dict[str, dict[str, Any]] | None = None,
+                types: dict[str, dict[str, int]] | None = None) -> C4Model:
     """Build the model.
 
     member_deps: dependencies of the services named in cfg.include, which
     become containers of the target system next to the target service.
+    types: span counts per span type of each neighbouring service.
     """
     target = cfg.service
     member_deps = member_deps or {}
+    types = types or {}
     meta = _definition_attrs(definition)
     description, tech = _container_meta(meta)
 
@@ -174,13 +190,19 @@ def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
         existing = next((e for e in model.all_elements() if e.key == key), None)
         if existing:
             return existing
-        # Explicit classification first, then the name hints.
+        # Explicit classification first, then the span type Datadog recorded,
+        # then the name hints.
+        span_type = _span_type(types.get(name))
         if _glob(name, cfg.datastores):
             kind = "datastore"
         elif _glob(name, cfg.external):
             kind = "external"
         elif _glob(name, cfg.internal):
             kind = "internal"
+        elif span_type in DATASTORE_TYPES:
+            kind = "datastore"
+        elif span_type in SERVICE_TYPES:
+            kind = "external" if _matches(name, EXTERNAL_HINTS) else "internal"
         elif _matches(name, DATASTORE_HINTS) and not _matches(name, EXTERNAL_HINTS):
             kind = "datastore"
         elif _matches(name, EXTERNAL_HINTS):
@@ -189,7 +211,8 @@ def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
             kind = "internal"
         if kind == "datastore":
             el = Element(key, name, "container", "Datastore used by the system.",
-                         technology="Datastore", database=True, parent_key=system.key)
+                         technology=span_type if span_type in DATASTORE_TYPES else "Datastore",
+                         database=True, parent_key=system.key)
             system.children.append(el)
         elif kind == "external":
             el = Element(key, name, "system", "External service.", external=True)

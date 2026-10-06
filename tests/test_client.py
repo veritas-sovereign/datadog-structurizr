@@ -144,7 +144,8 @@ def test_fetch_all_saves_every_response(monkeypatch, online_cfg):
     assert "https://api.datadoghq.com/api/v1/service_dependencies/team/worker" in urls
     raw = online_cfg.raw_dir
     assert sorted(p.name for p in raw.iterdir()) == [
-        "definition.json", "dependencies-team_worker.json", "dependencies.json", "resources.json"]
+        "definition.json", "dependencies-team_worker.json", "dependencies.json", "resources.json",
+        "types.json"]
     assert json.loads((raw / "dependencies.json").read_text()) == fetched.deps
     assert json.loads((raw / "resources.json").read_text()) == fetched.resources
     assert not list(online_cfg.output_dir.glob(".raw-*"))
@@ -155,7 +156,8 @@ def test_fetch_all_replaces_stale_raw_files(monkeypatch, online_cfg):
     (online_cfg.raw_dir / "definition.json").write_text("{}")
     fake_datadog(monkeypatch, definition_status=404)
     client.fetch_all(online_cfg)
-    assert sorted(p.name for p in online_cfg.raw_dir.iterdir()) == ["dependencies.json", "resources.json"]
+    assert sorted(p.name for p in online_cfg.raw_dir.iterdir()) == [
+        "dependencies.json", "resources.json", "types.json"]
 
 
 def test_fetch_all_failure_leaves_raw_untouched(monkeypatch, online_cfg):
@@ -201,3 +203,32 @@ def test_429_without_a_usable_reset_fails_at_once(monkeypatch, online_cfg, sleep
     with pytest.raises(client.DatadogAPIError, match="429"):
         client.fetch_service_dependencies(online_cfg)
     assert sleeps == []
+
+
+def test_span_types_one_query_grouped_by_service_then_type(monkeypatch, online_cfg):
+    sent = []
+
+    def fake_post(url, headers, json, timeout):
+        sent.append(json["data"]["attributes"])
+        return FakeResponse(200, {"data": [
+            bucket({"service": "orders-db", "type": "sql"}, 900),
+            bucket({"service": "cart", "type": "web"}, 50),
+            bucket({"service": "cart", "type": ""}, 20),
+        ]})
+
+    monkeypatch.setattr(client.requests, "post", fake_post)
+    assert client.fetch_span_types(online_cfg, ["cart", "orders-db"]) == {
+        "orders-db": {"sql": 900}, "cart": {"web": 50, "": 20}}
+    (attrs,) = sent
+    assert attrs["filter"]["query"] == 'env:prod service:("cart" OR "orders-db")'
+    assert [g["facet"] for g in attrs["group_by"]] == ["service", "type"]
+
+
+def test_span_types_skip_the_call_without_neighbours(monkeypatch, online_cfg):
+    monkeypatch.setattr(client.requests, "post", lambda *a, **k: pytest.fail("no call expected"))
+    assert client.fetch_span_types(online_cfg, []) == {}
+
+
+def test_span_types_optional_offline(offline_cfg):
+    (offline_cfg.raw_dir / "types.json").unlink(missing_ok=True)
+    assert client.fetch_span_types(offline_cfg, ["x"]) == {}

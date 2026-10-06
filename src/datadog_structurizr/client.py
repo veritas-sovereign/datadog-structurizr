@@ -126,18 +126,16 @@ def fetch_service_dependencies(cfg: Config, service: str | None = None) -> dict[
     return resp.json()
 
 
-def _aggregate_resources(cfg: Config, query: str) -> list[dict[str, Any]]:
+def _aggregate(cfg: Config, query: str, facets: list[tuple[str, int]]) -> list[dict[str, Any]]:
+    """Span counts grouped by facets, as [{"by": {facet: value}, "compute": {"c0": n}}]."""
+    order = {"aggregation": "count", "order": "desc", "type": "measure"}
     body = {
         "data": {
             "type": "aggregate_request",
             "attributes": {
                 "filter": {"from": f"now-{cfg.lookback_hours}h", "to": "now", "query": query},
                 "compute": [{"aggregation": "count", "type": "total"}],
-                "group_by": [{
-                    "facet": "resource_name",
-                    "limit": 100,
-                    "sort": {"aggregation": "count", "order": "desc", "type": "measure"},
-                }],
+                "group_by": [{"facet": f, "limit": limit, "sort": order} for f, limit in facets],
             },
         }
     }
@@ -169,9 +167,9 @@ def fetch_resources(cfg: Config) -> list[dict[str, Any]]:
     # Prefer server/consumer spans so client calls (SQL, outbound HTTP) don't
     # show up as components; fall back only when that query succeeds with no
     # buckets (the tracer doesn't set span.kind), never after a failed call.
-    buckets = _aggregate_resources(cfg, f"{base} @span.kind:(server OR consumer)")
+    buckets = _aggregate(cfg, f"{base} @span.kind:(server OR consumer)", [("resource_name", 100)])
     if not buckets:
-        buckets = _aggregate_resources(cfg, base)
+        buckets = _aggregate(cfg, base, [("resource_name", 100)])
 
     return [
         {
@@ -207,24 +205,57 @@ def fetch_service_definition(cfg: Config) -> dict[str, Any]:
     return resp.json()
 
 
+def fetch_span_types(cfg: Config, services: list[str]) -> dict[str, dict[str, int]]:
+    """Span counts per span type for each service, from the services' own spans.
+
+    One spans aggregate grouped by service, then type. A datastore reports one
+    type (sql, redis, ...); an application service mostly web or http.
+    Returns {service: {type: span count}}; "" is spans with no type.
+    """
+    if cfg.offline:
+        try:
+            return _load(cfg, "types")
+        except SystemExit:
+            return {}  # raw/ from before types were fetched: classify by name
+    if not services:
+        return {}
+    names = " OR ".join('"' + s.replace('"', '\\"') + '"' for s in services)
+    buckets = _aggregate(cfg, f"env:{cfg.env} service:({names})",
+                         [("service", len(services)), ("type", 10)])
+    types: dict[str, dict[str, int]] = {}
+    for b in buckets:
+        by = b.get("by", {})
+        if by.get("service"):
+            types.setdefault(str(by["service"]), {})[str(by.get("type") or "")] = \
+                int((b.get("compute") or {}).get("c0") or 0)
+    return types
+
+
 @dataclass
 class Fetched:
     deps: dict[str, Any]
     member_deps: dict[str, dict[str, Any]]
     resources: list[dict[str, Any]]
     definition: dict[str, Any]
+    types: dict[str, dict[str, int]]
 
 
 def fetch_all(cfg: Config) -> Fetched:
     """Every input of one run. Online, raw/ is replaced only after all calls succeed."""
+    deps = fetch_service_dependencies(cfg)
+    member_deps = {name: fetch_service_dependencies(cfg, name) for name in cfg.include}
+    neighbours = sorted({n for d in (deps, *member_deps.values())
+                         for n in (d.get("calls") or []) + (d.get("called_by") or [])}
+                        - {cfg.service, *cfg.include})
     fetched = Fetched(
-        deps=fetch_service_dependencies(cfg),
-        member_deps={name: fetch_service_dependencies(cfg, name) for name in cfg.include},
+        deps=deps, member_deps=member_deps,
         resources=fetch_resources(cfg),
         definition=fetch_service_definition(cfg),
+        types=fetch_span_types(cfg, neighbours),
     )
     if not cfg.offline:
-        files = {"dependencies": fetched.deps, "resources": fetched.resources}
+        files = {"dependencies": fetched.deps, "resources": fetched.resources,
+                 "types": fetched.types}
         files.update((_dependencies_name(cfg, name), deps) for name, deps in fetched.member_deps.items())
         if fetched.definition:
             files["definition"] = fetched.definition

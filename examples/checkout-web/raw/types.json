@@ -1,0 +1,11 @@
+{
+  "api-gateway": {"web": 52000, "http": 48000},
+  "cart-service": {"web": 30500, "http": 12100, "": 900},
+  "checkout-postgres": {"sql": 88000},
+  "ledger": {"sql": 4100},
+  "mobile-bff": {"web": 9100, "http": 8800},
+  "otel-collector": {"": 1200},
+  "payment-service": {"web": 12500, "http": 6400},
+  "redis": {"redis": 41000},
+  "stripe-api": {"http": 3900}
+}

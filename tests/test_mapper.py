@@ -185,3 +185,22 @@ def test_strip_prefixes_splits_a_context_path():
     assert _names(resources) == [("Shop API", 9), ("Shopping-List API", 2)]
     assert _names(resources, strip_prefixes=("/shop",)) == [
         ("Cart API", 5), ("Orders API", 3), ("Shopping-List API", 2), ("Root API", 1)]
+
+
+def test_span_type_classifies_names_the_hints_miss(offline_cfg):
+    m = build_model({"calls": ["cache-node-01", "user-persistence-v2", "orders-db-api", "pricing"]}, [], {},
+                    offline_cfg, types={"cache-node-01": {"redis": 40}, "user-persistence-v2": {"sql": 90, "": 3},
+                                        "orders-db-api": {"web": 70, "http": 30}, "pricing": {"queue": 5}})
+    db = {c.name: c.technology for c in m.target_system.children if c.database}
+    assert db == {"cache-node-01": "redis", "user-persistence-v2": "sql"}
+    # A service type overrides the "db" name hint; an unknown type leaves it to the hints.
+    assert {s.name for s in m.systems} == {"orders-db-api", "pricing"}
+
+
+def test_config_classification_beats_span_type(offline_cfg):
+    import dataclasses
+    cfg = dataclasses.replace(offline_cfg, internal=("legacy-store",), datastores=("api-*",))
+    m = build_model({"calls": ["legacy-store", "api-cache"]}, [], {}, cfg,
+                    types={"legacy-store": {"sql": 10}, "api-cache": {"web": 10}})
+    assert {c.name for c in m.target_system.children if c.database} == {"api-cache"}
+    assert {s.name for s in m.systems} == {"legacy-store"}
