@@ -30,10 +30,15 @@ EXTERNAL_HINTS = (
     "salesforce", "hubspot", "segment", "googleapis", "amazonaws",
 )
 DATASTORE_HINTS = (
-    "postgres", "mysql", "mariadb", "mongo", "redis", "memcache", "cassandra",
+    "postgres", "mysql", "mariadb", "mongo", "mongodb", "redis", "memcache", "cassandra",
     "dynamodb", "elasticsearch", "opensearch", "clickhouse", "sqlserver",
     "oracle", "db", "kafka", "rabbitmq",
 )
+# Short or common-word hints match only a whole name token (split on anything
+# but letters and digits): redistribution is not redis, user-segments-api is
+# not Segment, transactions3 is not S3. The other hints are distinctive enough
+# to match anywhere in the name.
+TOKEN_HINTS = frozenset({"s3", "sqs", "sns", "segment", "redis", "mongo", "mongodb", "db", "oracle"})
 # Span types (the `type` of a service's own spans) seen on a live account.
 # A dependency whose most common type is one of these is a datastore; one whose
 # most common type is a service type is not, whatever its name suggests. Any
@@ -92,8 +97,7 @@ def _hint(name: str, hints: tuple[str, ...]) -> str:
     """The first hint the name matches, or ""."""
     lower = name.lower()
     tokens = set(re.split(r"[^a-z0-9]+", lower))
-    # "db" only as a whole token, everything else as substring
-    return next((h for h in hints if ((h in tokens) if h == "db" else (h in lower))), "")
+    return next((h for h in hints if ((h in tokens) if h in TOKEN_HINTS else (h in lower))), "")
 
 
 def _definition_attrs(definition: dict[str, Any]) -> dict[str, Any]:
