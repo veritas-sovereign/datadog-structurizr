@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `--no-raw`: draw the diagrams without saving the Datadog responses to `raw/`, where they must not be stored.
 - Each dependency and included service has a `Classified by` property in `datadog-model.dsl` that names the rule that placed it: a `[classify]` pattern, its span type, a name hint, or none.
 
+### Changed
+
+- CI runs `ruff check` and `pyright`; both are in the `dev` extra.
+
 ### Fixed
 
 - Services whose names make the same identifier (`cart-service`, `cart.service`, `cart_service`) were drawn as one element with the relationships of all of them. A service named `user`, or `<system>_system`, was merged into the person or the system the same way. Each name now gets its own element: the first keeps the identifier, later ones get `_2`, `_3`, and the run prints a warning. Components are handled the same way.

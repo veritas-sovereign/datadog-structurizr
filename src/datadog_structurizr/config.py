@@ -10,7 +10,7 @@ import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from dotenv import load_dotenv
 
@@ -55,7 +55,7 @@ class Config:
     person_description: str = "End user of the web component."
     max_components: int = 12  # L2 keeps this many, the last one being "Other"
     strip_prefixes: tuple[str, ...] = ()  # path prefixes removed before grouping routes
-    source_file: Optional[Path] = field(default=None, compare=False)
+    source_file: Path | None = field(default=None, compare=False)
 
     @property
     def raw_dir(self) -> Path:

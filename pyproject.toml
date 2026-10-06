@@ -27,7 +27,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "ruff>=0.15", "pyright>=1.1.400"]
 
 [project.urls]
 Homepage = "https://github.com/veritas-sovereign/datadog-structurizr"
@@ -41,3 +41,14 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, bugbear and pyupgrade. Import order is left as written.
+select = ["E", "F", "W", "B", "UP"]
+
+[tool.pyright]
+include = ["src", "tests"]
