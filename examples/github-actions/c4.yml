@@ -1,0 +1,64 @@
+# Example workflow for a documentation repository that keeps its C4 model in
+# docs/architecture/ (c4.toml, workspace.dsl, datadog-*.dsl, raw/).
+# Copy it to .github/workflows/c4.yml there and adjust the paths.
+#
+# Pull requests and pushes that touch the model rebuild it from the committed
+# raw/ responses (no Datadog keys needed, so it also works for pull requests
+# from forks) and validate it. A manual or scheduled run fetches fresh data
+# with DD_API_KEY and DD_APP_KEY from the repository secrets; commit the
+# regenerated files from that run yourself, or open a pull request with them.
+# GitHub emails a failed scheduled run only to whoever last edited the cron,
+# so make sure that person watches it.
+name: c4
+
+on:
+  pull_request:
+    paths: ["docs/architecture/**"]
+  push:
+    branches: [main]
+    paths: ["docs/architecture/**"]
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"   # Mondays 06:00 UTC
+
+permissions:
+  contents: read
+
+env:
+  MODEL_DIR: docs/architecture
+  # Pinned by digest: tags can move.
+  STRUCTURIZR_IMAGE: structurizr/structurizr:2026.09.19@sha256:721136283c2f9cf1ba69037bc9de136c579d66fdcb2d771cb60546ec68def1a5
+
+jobs:
+  c4:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      # Until datadog-structurizr is on PyPI, install it from GitHub. Pin a
+      # commit or tag rather than main: a broken main breaks this workflow.
+      - run: pip install "datadog-structurizr @ git+https://github.com/veritas-sovereign/datadog-structurizr@main"
+
+      - name: Rebuild from committed raw responses
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        run: datadog-structurizr -c "$MODEL_DIR/c4.toml" -o "$MODEL_DIR" --offline --no-render --no-input
+
+      - name: Fetch fresh data from Datadog
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          DD_APP_KEY: ${{ secrets.DD_APP_KEY }}
+        run: datadog-structurizr -c "$MODEL_DIR/c4.toml" -o "$MODEL_DIR" --no-render --no-input
+
+      # Fails on DSL errors, and on a hand-written relationship in
+      # workspace.dsl whose element was renamed or disappeared.
+      - name: Validate the workspace
+        run: |
+          docker run --rm -v "$PWD/$MODEL_DIR:/usr/local/structurizr" "$STRUCTURIZR_IMAGE" \
+            validate -workspace /usr/local/structurizr/workspace.dsl
+
+      - name: Show what Datadog changed
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        run: git status --short -- "$MODEL_DIR"

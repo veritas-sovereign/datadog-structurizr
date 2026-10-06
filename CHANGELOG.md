@@ -25,4 +25,5 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Failed Datadog calls stop the run with exit status 1, and no diagrams are written. Only a 404 from the service definition endpoint is accepted, since that means the service has no definition. The spans query without the `span.kind` filter is only sent when the filtered query succeeds with no results, never after a failed call.
 - `[components] max` sets how many components L2 shows (default 12).
 - L2 components are labelled for what APM sees: HTTP route groups have the technology `HTTP endpoint group`, other resources `Entry point`, and the L2 view description says they are entry points, not code structure.
+- `examples/github-actions/c4.yml`: a workflow that rebuilds the model from committed `raw/` responses on pull requests and validates it with the `structurizr/structurizr` image, and fetches fresh data on a manual or weekly run. The README shows how to view the output with Structurizr local and validate it with Docker.
 - `examples/checkout-web/`: a `c4.toml` and saved responses for a web service and its worker.

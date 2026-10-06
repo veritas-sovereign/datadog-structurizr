@@ -71,7 +71,7 @@ To try it without Datadog keys, download [`examples/checkout-web/`](examples/che
 datadog-structurizr -c c4.toml --offline -o .
 ```
 
-Paste `workspace-inline.dsl` into the [Structurizr DSL editor](https://structurizr.com/dsl), which cannot read `!include`, or open the `.mmd` files in any Mermaid viewer.
+Open the output folder in [Structurizr local](#viewing-locally), paste `workspace-inline.dsl` (one file, nothing to include) into the [Structurizr playground](https://playground.structurizr.com), or open the `.mmd` files in any Mermaid viewer.
 
 ## Installation
 
@@ -271,7 +271,13 @@ output/
 2. Run against Datadog once: `datadog-structurizr -c c4.toml`.
 3. Look at the SVGs. Add the services that belong to the system to `include`, move wrongly grouped dependencies with `[classify]`, and drop noise with `ignore`. Then run again with `--offline`, which makes no API calls. A service newly added to `include` needs one more online run, to fetch its dependencies.
 4. Add to `workspace.dsl` the elements and relationships Datadog cannot see, such as which component calls which downstream service. Commit `c4.toml`, `workspace.dsl` and the two `datadog-*.dsl` files to your documentation repository. Later runs rewrite only the `datadog-*.dsl` files.
-5. Optionally validate it with structurizr-cli, or with [`drawio-structurizr --validate`](https://github.com/veritas-sovereign/drawio-structurizr#validating-with-structurizr-cli), whose Docker image includes structurizr-cli.
+5. Validate it, so a hand-written relationship to a renamed element is caught:
+
+   ```bash
+   docker run --rm -v "$PWD/output:/usr/local/structurizr" structurizr/structurizr validate -workspace /usr/local/structurizr/workspace.dsl
+   ```
+
+   [`examples/github-actions/c4.yml`](examples/github-actions/c4.yml) does this in CI: pull requests rebuild the model from the committed `raw/` responses and validate it, and a manual or weekly run fetches fresh data with the Datadog keys from the repository secrets. Until the package is on PyPI, the example installs it from GitHub; pin a commit there rather than `main`.
 
 ### Rendering
 
@@ -281,6 +287,16 @@ output/
 | [structurizr-cli](https://docs.structurizr.com/cli) + [PlantUML](https://plantuml.com/) | both on `PATH` | `plantuml/*.puml` and `plantuml/*.svg` |
 
 When neither is installed, only the sources are written. The generated workspace sets no theme, so structurizr-cli needs no network access to read it.
+
+### Viewing locally
+
+[Structurizr local](https://docs.structurizr.com/local) serves the workspace in a browser, with a diagram editor for layout. It reads `workspace.dsl` from the mounted folder, so the `!include` files are found next to it:
+
+```bash
+docker run -it --rm -p 8080:8080 -v "$PWD/output:/usr/local/structurizr" structurizr/structurizr local
+```
+
+Then open http://localhost:8080. Structurizr Lite and the separate `structurizr/cli` image are end of life; the `structurizr/structurizr` image replaces both.
 
 ## Datadog access
 
