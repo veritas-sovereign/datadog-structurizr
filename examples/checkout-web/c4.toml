@@ -29,5 +29,8 @@ external = []
 internal = []
 
 # Most components shown in L2; the last one collects the rest as "Other".
+# strip_prefixes removes a context path shared by every route ("/shop/...")
+# so routes are grouped by the segment after it.
 [components]
 max = 12
+strip_prefixes = []

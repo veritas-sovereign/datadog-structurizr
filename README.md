@@ -215,6 +215,7 @@ internal = []
 
 [components]
 max = 12
+strip_prefixes = []
 ```
 
 | Key | Type | Meaning |
@@ -230,6 +231,7 @@ max = 12
 | `[person] name`, `description` | string | the person (default `User`) |
 | `[classify] datastores`, `external`, `internal` | list | force a dependency into a group, overriding the name hints |
 | `[components] max` | integer | most components shown in L2, the last being `Other` (default 12, at least 2) |
+| `[components] strip_prefixes` | list | path prefixes removed before routes are grouped, such as an app's context path `"/shop"` |
 
 `ignore` and the `[classify]` lists accept `fnmatch` patterns (`*`, `?`, `[abc]`) and ignore case. Top-level keys such as `ignore` must come before the first `[table]`, as TOML requires. Unknown keys and wrong types stop the run with an error naming the key, so a typo cannot be silently ignored. Datadog keys are refused in the config file.
 
@@ -368,7 +370,10 @@ A service that calls itself gets no relationship. Relationships between containe
 
 - HTTP resources such as `GET /api/v1/cart/{id}` are grouped by their first path segment after `api`, version segments (`v1`, `v2`), and ids. `GET /api/v1/cart/{id}` and `POST /api/v1/cart/items` both go into `Cart API`, with the technology `HTTP endpoint group`.
 - Other resources, such as queue consumers and jobs, each become one component with the technology `Entry point`.
-- Probe endpoints (`/health`, `/healthz`, `/ready`, `/readyz`, `/live`, `/livez`, `/ping`, `/metrics`) are dropped.
+- Probe endpoints are dropped: paths whose last segment is `health` or ends in `health` (`app-health`, `service-health`), `healthz`, `healthcheck`, `ready`, `readyz`, `live`, `livez`, `ping` or `metrics`, and any path with an `actuator` segment.
+- Static files (`.js`, `.css`, `.html`, images, fonts, also pre-compressed as `.br` or `.gz`) go into one `Static content` component.
+- A method with no route (`GET`, `POST`), which some tracers record when they cannot name the endpoint, goes into one `Unrouted HTTP` component.
+- When every route starts with the same context path, such as `/shop/...`, they all land in one group. List that prefix in `[components] strip_prefixes` to group by the segment after it.
 - Components are sorted by span count. At most 12 are shown, and the rest are combined into `Other`. Change the number with `[components] max`.
 - The person calls each HTTP endpoint group. Without a person, the services that call the target service do. Entry points get no incoming relationship.
 - Components are only built for the target service, not for included services. Run the tool again with an included service as `service` to get its components.

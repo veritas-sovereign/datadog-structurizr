@@ -1,4 +1,5 @@
-from datadog_structurizr.mapper import ENTRY_POINT, HTTP_GROUP, _group_resources, build_model
+from datadog_structurizr.mapper import (ENTRY_POINT, HTTP_GROUP, STATIC, UNROUTED, _group_resources,
+                                        build_model)
 
 MAX_COMPONENTS = 12
 
@@ -151,3 +152,36 @@ def test_without_person_callers_reach_http_components(offline_cfg):
     comp_targets = {r.target_key for r in m.relationships if r.source_key == "api_gateway"}
     assert "checkout_web__Cart_API" in comp_targets
     assert not any(r.target_key.endswith("nightly_job") for r in m.relationships)
+
+
+def _names(resources, **kw):
+    return [(g[0], g[3]) for g in _group_resources([{"resource": r, "hits": h} for r, h in resources], **kw)]
+
+
+def test_health_and_actuator_paths_dropped_anywhere():
+    assert _names([
+        ("GET /shop/health", 9), ("GET /shop/service-health", 9), ("GET /shop/app-health", 9),
+        ("GET /shop/api/cart/actuator/info", 9), ("GET /shop/healthcheck", 9),
+        ("GET /shop/healthcare-plans", 1),
+    ]) == [("Shop API", 1)]
+
+
+def test_static_files_grouped_once():
+    groups = _group_resources([{"resource": r, "hits": 2} for r in (
+        "GET /index.html", "GET /static/bundle.js.br", "GET /assets/app.css",
+        "GET /img/logo@2x.jpg", "GET /fonts/x.woff2")])
+    assert [(g[0], g[1], g[3]) for g in groups] == [(STATIC, HTTP_GROUP, 10)]
+
+
+def test_method_without_route_is_one_unrouted_group():
+    groups = _group_resources([{"resource": "GET", "hits": 5}, {"resource": "POST", "hits": 3},
+                               {"resource": "order.created consume", "hits": 1}])
+    assert [(g[0], g[1], g[3]) for g in groups] == [(UNROUTED, HTTP_GROUP, 8), ("order.created consume", ENTRY_POINT, 1)]
+
+
+def test_strip_prefixes_splits_a_context_path():
+    resources = [("GET /shop/api/cart/{id}", 5), ("GET /shop/api/orders", 3), ("GET /shop", 1),
+                 ("GET /shopping-list", 2)]
+    assert _names(resources) == [("Shop API", 9), ("Shopping-List API", 2)]
+    assert _names(resources, strip_prefixes=("/shop",)) == [
+        ("Cart API", 5), ("Orders API", 3), ("Shopping-List API", 2), ("Root API", 1)]
