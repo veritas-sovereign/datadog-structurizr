@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-06
+
 ### Added
 
 - `datadog-structurizr` command: reads one APM service from Datadog and writes C4 system context (L0), container (L1) and component (L2) views as a Structurizr DSL workspace and as Mermaid C4 diagrams.
@@ -26,7 +28,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `[components] max` sets how many components L2 shows (default 12).
 - L2 components are labelled for what APM sees: HTTP route groups have the technology `HTTP endpoint group`, other resources `Entry point`, and the L2 view description says they are entry points, not code structure.
 - `examples/github-actions/c4.yml`: a workflow that rebuilds the model from committed `raw/` responses on pull requests and validates it with the `structurizr/structurizr` image, and fetches fresh data on a manual or weekly run. The README shows how to view the output with Structurizr local and validate it with Docker.
-- `Dockerfile`: an image with the tool and no renderers, on a base image pinned by digest, running as a non-root user. CI builds it and runs the example offline in it; it is not published yet.
+- `Dockerfile`: an image with the tool and no renderers, on a base image pinned by digest, running as a non-root user. CI builds it and runs the example offline in it, and release tags publish it to `ghcr.io/veritas-sovereign/datadog-structurizr` for amd64 and arm64.
 - Span aggregate responses are read in the shape the live API returns (`data[].attributes.by` and `attributes.compute`); a response in any other shape stops the run instead of being read as empty. Checked against a live Datadog account.
 - `.env` is read from the current directory only. Before, an editable install also found the repository's `.env` by searching upwards from the package folder.
 - L2 grouping, from a live service: probe paths are also dropped when the last segment ends in `health` or any segment is `actuator`; static files go into one `Static content` component; methods with no route go into one `Unrouted HTTP` component instead of one component each; `[components] strip_prefixes` removes a shared context path before grouping.
@@ -35,3 +37,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `DD_SITE` (and `site` in the config file) accepts the forms copied from a browser or the API docs: `https://`, `api.` or `app.` and a trailing `/` are removed. Before, `api.datadoghq.com` made every call fail with 401.
 - The README documents exporting PlantUML or Mermaid with the `structurizr/structurizr` image, which replaces the end-of-life structurizr-cli; CI checks the documented command writes all three views.
 - `examples/checkout-web/`: a `c4.toml` and saved responses for a web service and its worker.
+
+[Unreleased]: https://github.com/veritas-sovereign/datadog-structurizr/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/veritas-sovereign/datadog-structurizr/releases/tag/v0.1.0

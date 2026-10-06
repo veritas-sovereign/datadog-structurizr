@@ -1,0 +1,4 @@
+include tests/conftest.py
+# The example config and saved responses (made up) are test fixtures.
+include examples/README.md
+recursive-include examples/checkout-web *.toml *.json

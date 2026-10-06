@@ -81,7 +81,7 @@ Pick one:
 | --- | --- | --- |
 | [PyPI](#from-pypi) | everyday use | Python 3.9+; optionally `mmdc` (Node.js) to render SVGs |
 | [From source](#from-source) | changing the tool or running its tests | Python 3.9+, git |
-| [Docker](#docker) | running without Python | Docker; build the image yourself for now |
+| [Docker](#docker) | running without Python | Docker |
 
 You also need a Datadog API key and application key. See [Datadog access](#datadog-access).
 
@@ -134,18 +134,14 @@ To use the code without installing it, run `pip install -r requirements.txt` and
 
 ### Docker
 
-The [`Dockerfile`](Dockerfile) builds an image with the tool and no renderers. It is not published yet; CI builds and tests it on every change. Build it from a clone:
-
-```bash
-docker build -t datadog-structurizr .
-```
+Each release publishes an image with the tool and no renderers to `ghcr.io/veritas-sovereign/datadog-structurizr`, for amd64 and arm64, tagged with the version (`0.1.0`) and the minor version (`0.1`). It is built from the [`Dockerfile`](Dockerfile); `docker build -t datadog-structurizr .` builds the same image from a clone.
 
 Run it in the folder that holds `c4.toml`. `--user` makes the output files yours, and the keys come from the environment:
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" \
   -e DD_API_KEY -e DD_APP_KEY \
-  datadog-structurizr -c c4.toml -o . --no-render
+  ghcr.io/veritas-sovereign/datadog-structurizr:0.1.0 -c c4.toml -o . --no-render
 ```
 
 The image has no `mmdc` or structurizr-cli, so use `--no-render`, and [view](#viewing-locally) or validate the output with the `structurizr/structurizr` image.
@@ -454,8 +450,9 @@ datadog-structurizr/
 │   ├── dependabot.yml           weekly updates for GitHub Actions and the Docker base image
 │   └── workflows/
 │       ├── test.yml             pytest on Python 3.9 and 3.13, Structurizr validation, Docker image build
-│       └── publish-pypi.yml     builds the package; publishes it to PyPI on v* tags
-├── Dockerfile                   image with the tool and no renderers; not published yet
+│       ├── publish-pypi.yml     builds the package; publishes it to PyPI on v* tags
+│       └── publish-image.yml    tests the image; publishes it to GHCR on v* tags
+├── Dockerfile                   image with the tool and no renderers; published to GHCR on releases
 ├── .dockerignore
 ├── .env.example                 settings template
 ├── pyproject.toml               package metadata and datadog-structurizr command
