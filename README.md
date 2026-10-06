@@ -393,14 +393,16 @@ A service that calls itself gets no relationship. Relationships between containe
 
 ### Identifiers
 
-Element identifiers are the names with every character other than a letter, digit or `_` replaced by `_`. The system's identifier is its name followed by `_system`. Component identifiers are prefixed with their container's identifier and `__`. Output is the same for the same input.
+Element identifiers are the names with every character other than a letter, digit or `_` replaced by `_`. The system's identifier is its name followed by `_system`, and the person's is `user`. Component identifiers are prefixed with their container's identifier and `__`. Output is the same for the same input.
+
+Different names can make the same identifier: `cart-service`, `cart.service` and `cart_service` all make `cart_service`. The first one met keeps it, and each later one gets `_2`, `_3` and so on, so they stay separate elements. The run prints a warning for each. The order follows the Datadog responses, so which name gets the suffix can change when they change; use `ignore` if one of the names is noise.
 
 ## Limitations
 
 - **Span types and names decide the element type** unless you classify them. A dependency with no typed spans in the window, or a type outside the known lists, is classified by name. Check L1, and use `[classify]` for anything in the wrong group.
 - **No component-to-dependency relationships.** Datadog does not say which entry point calls which downstream service, so L2 shows no relationships from components to other services. Add them by hand in `workspace.dsl`.
 - **Hand edits appear only in the Structurizr output.** The Mermaid diagrams are drawn from Datadog data alone.
-- **Generated identifiers can change.** Hand-written relationships refer to generated identifiers such as `checkout_web__Cart_API`. If a service or route group is renamed or disappears, structurizr-cli reports the dangling identifier, and you fix `workspace.dsl` by hand.
+- **Generated identifiers can change.** Hand-written relationships refer to generated identifiers such as `checkout_web__Cart_API`. If a service or route group is renamed or disappears, Structurizr validation reports the dangling identifier, and you fix `workspace.dsl` by hand.
 - **One system per run.** Run the command once per system and merge the workspaces by hand if you need a landscape view.
 - **Layout is automatic.** Structurizr views use `autoLayout`. Mermaid's C4 layout is basic; for presentation diagrams, use the Structurizr output.
 

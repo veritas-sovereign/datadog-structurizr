@@ -43,6 +43,7 @@ class C4Model:
     target_container: Element
     systems: list[Element] = field(default_factory=list)   # neighbours, not the target
     relationships: list[Relationship] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)  # printed by the CLI, not drawn
 
     def relate(self, source: str, target: str, description: str, technology: str = "") -> None:
         if source == target:  # a service calling itself is not an architectural edge

@@ -42,6 +42,15 @@ def test_workspace_without_includes_is_kept_with_warning(checkout_dir, capsys):
     assert "does not !include datadog-model.dsl" in capsys.readouterr().out
 
 
+def test_identifier_collision_is_reported(checkout_dir, capsys):
+    deps = checkout_dir / "raw" / "dependencies.json"
+    deps.write_text(deps.read_text().replace('"cart-service",', '"cart-service",\n    "cart.service",'))
+    main(["--service", "checkout-web", "--env", "prod", "--offline", "-o", str(checkout_dir), "--no-render"])
+    assert "warning: 'cart.service' and 'cart-service' both make the identifier cart_service" \
+        in capsys.readouterr().out
+    assert 'cart_service_2 = softwareSystem "cart.service"' in (checkout_dir / "datadog-model.dsl").read_text()
+
+
 def test_offline_without_raw_files_exits(tmp_path):
     import pytest
     with pytest.raises(SystemExit, match="not found"):

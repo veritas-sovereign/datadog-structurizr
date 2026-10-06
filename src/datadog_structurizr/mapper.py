@@ -63,6 +63,31 @@ def _key(name: str) -> str:
     return f"e_{cleaned}" if not cleaned or cleaned[0].isdigit() else cleaned
 
 
+class _Keys:
+    """Hands out identifiers that are unique within one model.
+
+    _key() maps different names onto the same identifier (cart-service,
+    cart.service and cart_service are all cart_service). The first element
+    keeps it; each later one gets _2, _3, ... and a warning, so two services
+    are never drawn as one.
+    """
+
+    def __init__(self) -> None:
+        self._owner: dict[str, str] = {}   # identifier -> what it was made from
+        self.warnings: list[str] = []
+
+    def __call__(self, name: str, base: str | None = None) -> str:
+        base = base or _key(name)
+        key, n = base, 2
+        while key in self._owner:
+            key, n = f"{base}_{n}", n + 1
+        if key != base:
+            self.warnings.append(f"'{name}' and '{self._owner[base]}' both make the identifier "
+                                 f"{base}; '{name}' is {key}")
+        self._owner[key] = name
+        return key
+
+
 def _matches(name: str, hints: tuple[str, ...]) -> bool:
     lower = name.lower()
     tokens = set(re.split(r"[^a-z0-9]+", lower))
@@ -161,19 +186,24 @@ def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
     types = types or {}
     meta = _definition_attrs(definition)
     description, tech = _container_meta(meta)
+    keys = _Keys()
 
-    person = (Element("user", cfg.person_name, "person", cfg.person_description)
+    person = (Element(keys(cfg.person_name, "user"), cfg.person_name, "person", cfg.person_description)
               if cfg.person_enabled else None)
     system_name = cfg.system_name or target
-    system = Element(f"{_key(system_name)}_system", system_name, "system",
+    system = Element(keys(system_name, f"{_key(system_name)}_system"), system_name, "system",
                      cfg.system_description or meta["description"] or f"System containing {target}.")
-    container = Element(_key(target), target, "container", description,
+    container = Element(keys(target), target, "container", description,
                         technology=tech, parent_key=system.key)
     system.children.append(container)
+    # APM services by name: a name met again is the same element.
+    services = {target: container}
     for name in cfg.include:
-        system.children.append(Element(_key(name), name, "container",
-                                       "Container of the system observed in APM.",
-                                       technology="APM service", parent_key=system.key))
+        if name not in services:
+            services[name] = Element(keys(name), name, "container",
+                                     "Container of the system observed in APM.",
+                                     technology="APM service", parent_key=system.key)
+            system.children.append(services[name])
 
     model = C4Model(
         name=f"{system_name} - C4",
@@ -186,10 +216,9 @@ def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
         """The element for a dependency name, creating it on first sight; None if ignored."""
         if _glob(name, cfg.ignore):
             return None
-        key = _key(name)
-        existing = next((e for e in model.all_elements() if e.key == key), None)
-        if existing:
-            return existing
+        if name in services:
+            return services[name]
+        key = keys(name)
         # Explicit classification first, then the span type Datadog recorded,
         # then the name hints.
         span_type = _span_type(types.get(name))
@@ -220,6 +249,7 @@ def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
         else:
             el = Element(key, name, "system", "Internal service observed in APM.")
             model.systems.append(el)
+        services[name] = el
         return el
 
     # L0/L1 relationships at container level; Structurizr derives the
@@ -249,7 +279,7 @@ def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
                    ["No indexed spans found - refine by hand."], 0)]
     for name, comp_tech, samples, hits in groups:
         shown = "; ".join(samples[:3]) + (f" (+{len(samples) - 3} more)" if len(samples) > 3 else "")
-        comp = Element(f"{container.key}__{_key(name)}", name, "component",
+        comp = Element(keys(name, f"{container.key}__{_key(name)}"), name, "component",
                        f"{shown}" + (f" - {hits} spans" if hits else ""),
                        technology=comp_tech, parent_key=container.key)
         container.children.append(comp)
@@ -257,4 +287,5 @@ def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
             for caller in callers:
                 model.relate(caller, comp.key, "Calls", "HTTPS")
 
+    model.warnings = keys.warnings
     return model
