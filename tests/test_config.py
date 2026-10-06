@@ -144,3 +144,17 @@ def test_site_normalized(tmp_path, monkeypatch, given):
     monkeypatch.setenv("DD_SITE", given)
     cfg = load_config({"OFFLINE": "1", "OUTPUT_DIR": str(tmp_path / "o"), "DD_SERVICE": "w", "DD_ENV": "p"})
     assert cfg.site == "datadoghq.eu"
+
+
+def test_no_raw_creates_no_raw_folder(tmp_path, monkeypatch):
+    monkeypatch.setenv("DD_API_KEY", "k")
+    monkeypatch.setenv("DD_APP_KEY", "a")
+    cfg = load_config({"DD_SERVICE": "s", "DD_ENV": "prod", "NO_RAW": "1", "OUTPUT_DIR": str(tmp_path / "o")})
+    assert not cfg.save_raw
+    assert (tmp_path / "o").is_dir() and not cfg.raw_dir.exists()
+
+
+def test_no_raw_and_offline_are_refused(tmp_path):
+    with pytest.raises(SystemExit, match="--no-raw cannot be used with --offline"):
+        load_config({"DD_SERVICE": "s", "DD_ENV": "prod", "OFFLINE": "1", "NO_RAW": "1",
+                     "OUTPUT_DIR": str(tmp_path / "o")})

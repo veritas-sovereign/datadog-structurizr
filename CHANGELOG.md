@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- `--no-raw`: draw the diagrams without saving the Datadog responses to `raw/`, where they must not be stored.
 - Each dependency and included service has a `Classified by` property in `datadog-model.dsl` that names the rule that placed it: a `[classify]` pattern, its span type, a name hint, or none.
 
 ### Fixed

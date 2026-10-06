@@ -160,6 +160,15 @@ def test_fetch_all_replaces_stale_raw_files(monkeypatch, online_cfg):
         "dependencies.json", "resources.json", "types.json"]
 
 
+def test_fetch_all_with_no_raw_writes_nothing(monkeypatch, online_cfg):
+    (online_cfg.raw_dir / "dependencies.json").write_text('{"previous": "run"}')
+    fake_datadog(monkeypatch)
+    fetched = client.fetch_all(replace(online_cfg, save_raw=False))
+    assert fetched.resources == [{"resource": "GET /cart", "hits": 7}]
+    assert [p.name for p in online_cfg.raw_dir.iterdir()] == ["dependencies.json"]
+    assert sorted(p.name for p in online_cfg.output_dir.iterdir()) == ["raw"]
+
+
 def test_fetch_all_failure_leaves_raw_untouched(monkeypatch, online_cfg):
     (online_cfg.raw_dir / "dependencies.json").write_text('{"previous": "run"}')
     fake_datadog(monkeypatch, spans_status=500)

@@ -167,6 +167,7 @@ datadog-structurizr [-c c4.toml] [--service NAME] [--env ENV] [--hours N] [-o DI
 | `--include` | other APM services that are containers of the same system. Comma-separated, and repeatable. Adds to `include` in the config file |
 | `--no-person` | draw no person; for services only called by other services |
 | `--offline` | rebuild from `<output>/raw/*.json` instead of calling Datadog; no keys needed |
+| `--no-raw` | do not save the Datadog responses to `<output>/raw/`. A later `--offline` run then has nothing to read. Cannot be combined with `--offline` |
 | `--no-render` | write `.dsl` and `.mmd` sources only; do not render images |
 | `--no-input` | never prompt (see [Prompts](#prompts)) |
 | `--version` | print the version |
@@ -281,7 +282,7 @@ output/
 
 `raw/` is replaced as a whole, and only after every Datadog call of the run has succeeded. It never mixes responses from different runs, and a failed run leaves the previous one in place. Do not keep other files in it.
 
-`raw/` holds your internal service and route names. Check it before you commit it anywhere public.
+`raw/` holds your internal service and route names. Check it before you commit it anywhere public. Where the responses must not be stored at all, run with `--no-raw`: the diagrams are drawn from the responses in memory, and `raw/` is neither created nor changed. A `raw/` left by an earlier run stays as it is, and the run says so. The generated `.dsl` and `.mmd` files still contain the service and route names.
 
 ### Typical workflow
 
