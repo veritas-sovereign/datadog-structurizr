@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Amit Kumar" }]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = ["c4", "c4-model", "datadog", "apm", "structurizr", "mermaid", "architecture", "diagrams"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -44,7 +44,7 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint]
 # pycodestyle, pyflakes, bugbear and pyupgrade. Import order is left as written.

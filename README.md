@@ -16,7 +16,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/datadog-structurizr?logo=pypi&logoColor=white&label=PyPI)](https://pypi.org/project/datadog-structurizr/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-c9a227)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.9%2B-3776ab?logo=python&logoColor=white)](pyproject.toml)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776ab?logo=python&logoColor=white)](pyproject.toml)
 [![Input](https://img.shields.io/badge/Input-Datadog%20APM-632ca6?logo=datadog&logoColor=white)](https://docs.datadoghq.com/tracing/)
 [![Output](https://img.shields.io/badge/Output-Structurizr%20DSL-438dd5)](https://docs.structurizr.com/dsl)
 [![Output](https://img.shields.io/badge/Output-Mermaid%20C4-ff3670?logo=mermaid&logoColor=white)](https://mermaid.js.org/syntax/c4.html)
@@ -51,7 +51,7 @@ It is meant as a starting point for architecture documentation. Keep `workspace.
 
 ## Quick Start
 
-With Python (3.9 or later):
+With Python (3.10 or later):
 
 ```bash
 pip install datadog-structurizr
@@ -79,8 +79,8 @@ Pick one:
 
 | Option | Best for | You need |
 | --- | --- | --- |
-| [PyPI](#from-pypi) | everyday use | Python 3.9+; optionally `mmdc` (Node.js) to render SVGs |
-| [From source](#from-source) | changing the tool or running its tests | Python 3.9+, git |
+| [PyPI](#from-pypi) | everyday use | Python 3.10+; optionally `mmdc` (Node.js) to render SVGs |
+| [From source](#from-source) | changing the tool or running its tests | Python 3.10+, git |
 | [Docker](#docker) | running without Python | Docker |
 
 You also need a Datadog API key and application key. See [Datadog access](#datadog-access).
@@ -456,7 +456,7 @@ datadog-structurizr/
 ├── .github/
 │   ├── dependabot.yml           weekly updates for GitHub Actions and the Docker base image
 │   └── workflows/
-│       ├── test.yml             pytest on Python 3.9 and 3.13, ruff and pyright, Structurizr validation, Docker image build
+│       ├── test.yml             pytest on Python 3.10 and 3.13, ruff and pyright, Structurizr validation, Docker image build
 │       ├── publish-pypi.yml     builds the package; publishes it to PyPI on v* tags
 │       └── publish-image.yml    tests the image; publishes it to GHCR on v* tags
 ├── Dockerfile                   image with the tool and no renderers; published to GHCR on releases
