@@ -402,6 +402,25 @@ Different names can make the same identifier: `cart-service`, `cart.service` and
 
 ## Limitations
 
+The diagrams show what Datadog APM observed in the lookback window, not the intended architecture.
+
+Datadog data establishes:
+
+- which services called which, in the window (`service_dependencies`)
+- the target's entry points (`resource_name`), with span counts relative to each other
+- the span types of the neighbouring services
+- the description, team and languages, when the service has a definition
+
+It does not establish:
+
+- **The system boundary.** Which services form one system comes from `include` and the system name you give.
+- **Absence.** A call not seen in the window may still exist: a monthly job, a fallback path, a feature behind a flag. Use a longer `--hours` before you conclude that a dependency is gone.
+- **Internal or external.** A span type tells a datastore from a service, not your service from a vendor's. That decision comes from `[classify]` or a name hint, and the `Classified by` property says which.
+- **Absolute traffic.** Counts come from indexed spans, which retention filters sample.
+- **Code structure**, and which entry point calls which dependency; see below.
+
+Limits of the generated model:
+
 - **Span types and names decide the element type** unless you classify them. A dependency with no typed spans in the window, or a type outside the known lists, is classified by name. Check L1, and use `[classify]` for anything in the wrong group.
 - **No component-to-dependency relationships.** Datadog does not say which entry point calls which downstream service, so L2 shows no relationships from components to other services. Add them by hand in `workspace.dsl`.
 - **Hand edits appear only in the Structurizr output.** The Mermaid diagrams are drawn from Datadog data alone.
