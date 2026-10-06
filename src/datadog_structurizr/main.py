@@ -78,6 +78,8 @@ def main(argv: list[str] | None = None) -> int:
 
     print("[2/4] Building C4 model...")
     model = build_model(deps, resources, fetched.definition, cfg, member_deps, fetched.types)
+    for warning in model.warnings:
+        print(f"      warning: {warning}")
 
     print("[3/4] Writing Structurizr DSL and Mermaid sources...")
     out = cfg.output_dir

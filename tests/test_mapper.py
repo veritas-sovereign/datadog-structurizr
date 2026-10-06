@@ -204,3 +204,47 @@ def test_config_classification_beats_span_type(offline_cfg):
                     types={"legacy-store": {"sql": 10}, "api-cache": {"web": 10}})
     assert {c.name for c in m.target_system.children if c.database} == {"api-cache"}
     assert {s.name for s in m.systems} == {"legacy-store"}
+
+
+def test_names_with_the_same_identifier_stay_separate(offline_cfg):
+    m = _model(offline_cfg, calls=["cart-service", "cart.service"], called_by=["cart_service"])
+    assert [(s.name, s.key) for s in m.systems] == [
+        ("cart-service", "cart_service"), ("cart.service", "cart_service_2"), ("cart_service", "cart_service_3")]
+    pairs = {(r.source_key, r.target_key) for r in m.relationships}
+    assert {("checkout_web", "cart_service"), ("checkout_web", "cart_service_2"),
+            ("cart_service_3", "checkout_web")} <= pairs
+    assert len(m.warnings) == 2
+    assert "'cart.service' and 'cart-service' both make the identifier cart_service" in m.warnings[0]
+
+
+def test_service_named_like_the_person_is_not_the_person(offline_cfg):
+    m = _model(offline_cfg, calls=["user"])
+    assert m.person.key == "user"
+    assert [(s.name, s.key) for s in m.systems] == [("user", "user_2")]
+    assert ("checkout_web", "user_2") in {(r.source_key, r.target_key) for r in m.relationships}
+
+
+def test_service_named_like_the_system_is_not_the_system(offline_cfg):
+    m = _model(offline_cfg, called_by=["checkout_web_system"])
+    assert m.target_system.key == "checkout_web_system"
+    assert [s.key for s in m.systems] == ["checkout_web_system_2"]
+
+
+def test_components_with_the_same_identifier_stay_separate(offline_cfg):
+    m = _model(offline_cfg, resources=[("GET /cart-x", 5), ("GET /cart_x", 3)])
+    assert [(c.name, c.key) for c in m.target_container.children] == [
+        ("Cart-X API", "checkout_web__Cart_X_API"), ("Cart_X API", "checkout_web__Cart_X_API_2")]
+
+
+def test_every_identifier_is_unique(offline_cfg):
+    cfg = _cfg(offline_cfg, include=("checkout.worker",))
+    m = build_model({"calls": ["checkout-worker", "user", "checkout.worker"]},
+                    [{"resource": "GET /user", "hits": 1}], {}, cfg,
+                    {"checkout.worker": {"calls": ["checkout-web", "checkout_worker"], "called_by": []}})
+    keys = [e.key for e in m.all_elements()]
+    assert len(keys) == len(set(keys))
+    assert "checkout.worker" in {c.name for c in m.target_system.children}
+
+
+def test_no_warnings_without_collisions(offline_cfg):
+    assert _model(offline_cfg, calls=["cart-service"], resources=[("GET /cart", 1)]).warnings == []
