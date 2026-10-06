@@ -1,20 +1,33 @@
 """Datadog API calls.
 
 Plain `requests` so the endpoint being hit is explicit and easy to debug.
-Every response is saved under output/raw/ so a run can be replayed with
---offline (no credentials, no API calls) while tuning the diagrams.
+Once every call has succeeded, the responses replace output/raw/ as a whole,
+so a run can be replayed with --offline (no credentials, no API calls) while
+tuning the diagrams, and raw/ never mixes responses from different runs.
 """
 from __future__ import annotations
 
 import json
 import re
+import shutil
+import tempfile
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import requests
 
 from .config import Config
+
+
+class DatadogAPIError(RuntimeError):
+    """A Datadog call failed; the run stops rather than draw from partial data."""
+
+
+def _check(resp: requests.Response, what: str) -> None:
+    if resp.status_code != 200:
+        raise DatadogAPIError(f"Datadog API error {resp.status_code} for {what}: {resp.text[:500]}")
 
 
 def _headers(cfg: Config) -> dict[str, str]:
@@ -30,8 +43,20 @@ def _base(cfg: Config) -> str:
     return f"https://api.{cfg.site}"
 
 
-def _save(cfg: Config, name: str, data: Any) -> None:
-    (cfg.raw_dir / f"{name}.json").write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+def _replace_raw(cfg: Config, files: dict[str, Any]) -> None:
+    """Write the responses to a new directory, then swap it in for raw/."""
+    staging = Path(tempfile.mkdtemp(prefix=".raw-new-", dir=cfg.output_dir))
+    try:
+        for name, data in files.items():
+            (staging / f"{name}.json").write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    old = staging.with_name(staging.name.replace(".raw-new-", ".raw-old-"))
+    if cfg.raw_dir.exists():
+        cfg.raw_dir.rename(old)
+    staging.rename(cfg.raw_dir)
+    shutil.rmtree(old, ignore_errors=True)
 
 
 def _load(cfg: Config, name: str) -> Any:
@@ -39,6 +64,11 @@ def _load(cfg: Config, name: str) -> Any:
     if not path.exists():
         raise SystemExit(f"--offline: {path} not found. Run once online first.")
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _dependencies_name(cfg: Config, service: str) -> str:
+    return ("dependencies" if service == cfg.service
+            else "dependencies-" + re.sub(r"[^A-Za-z0-9._-]", "_", service))
 
 
 def fetch_service_dependencies(cfg: Config, service: str | None = None) -> dict[str, Any]:
@@ -52,10 +82,8 @@ def fetch_service_dependencies(cfg: Config, service: str | None = None) -> dict[
     Docs: https://docs.datadoghq.com/api/latest/service-dependencies/
     """
     service = service or cfg.service
-    name = ("dependencies" if service == cfg.service
-            else "dependencies-" + re.sub(r"[^A-Za-z0-9._-]", "_", service))
     if cfg.offline:
-        return _load(cfg, name)
+        return _load(cfg, _dependencies_name(cfg, service))
 
     end = int(time.time())
     params = {"env": cfg.env, "start": end - cfg.lookback_hours * 3600, "end": end}
@@ -63,11 +91,8 @@ def fetch_service_dependencies(cfg: Config, service: str | None = None) -> dict[
         f"{_base(cfg)}/api/v1/service_dependencies/{service}",
         headers=_headers(cfg), params=params, timeout=30,
     )
-    if resp.status_code != 200:
-        raise RuntimeError(f"Datadog API error {resp.status_code} for {service}: {resp.text[:500]}")
-    data = resp.json()
-    _save(cfg, name, data)
-    return data
+    _check(resp, f"service dependencies of {service}")
+    return resp.json()
 
 
 def _aggregate_resources(cfg: Config, query: str) -> list[dict[str, Any]]:
@@ -89,9 +114,7 @@ def _aggregate_resources(cfg: Config, query: str) -> list[dict[str, Any]]:
         f"{_base(cfg)}/api/v2/spans/analytics/aggregate",
         headers=_headers(cfg), json=body, timeout=60,
     )
-    if resp.status_code != 200:
-        print(f"      warning: spans aggregate {resp.status_code}: {resp.text[:300]}")
-        return []
+    _check(resp, f"spans aggregate ({query})")
     return resp.json().get("data", {}).get("buckets", []) or []
 
 
@@ -107,12 +130,13 @@ def fetch_resources(cfg: Config) -> list[dict[str, Any]]:
 
     base = f"service:{cfg.service} env:{cfg.env}"
     # Prefer server/consumer spans so client calls (SQL, outbound HTTP) don't
-    # show up as components; fall back if the tracer doesn't set span.kind.
+    # show up as components; fall back only when that query succeeds with no
+    # buckets (the tracer doesn't set span.kind), never after a failed call.
     buckets = _aggregate_resources(cfg, f"{base} @span.kind:(server OR consumer)")
     if not buckets:
         buckets = _aggregate_resources(cfg, base)
 
-    resources = [
+    return [
         {
             "resource": str(b.get("by", {}).get("resource_name", "")),
             "hits": int((b.get("computes") or {}).get("c0") or 0),
@@ -120,12 +144,12 @@ def fetch_resources(cfg: Config) -> list[dict[str, Any]]:
         for b in buckets
         if b.get("by", {}).get("resource_name")
     ]
-    _save(cfg, "resources", resources)
-    return resources
 
 
 def fetch_service_definition(cfg: Config) -> dict[str, Any]:
-    """Service Catalog metadata (description, team, languages). Optional.
+    """Service Catalog metadata (description, team, languages).
+
+    Optional: 404 (no definition) gives {}; any other error stops the run.
 
     GET /api/v2/services/definitions/{service_name}
     """
@@ -139,9 +163,33 @@ def fetch_service_definition(cfg: Config) -> dict[str, Any]:
         f"{_base(cfg)}/api/v2/services/definitions/{cfg.service}",
         headers=_headers(cfg), timeout=30,
     )
-    if resp.status_code != 200:
-        # Metadata is nice-to-have; don't fail the whole run.
+    if resp.status_code == 404:
+        # No definition in the Service Catalog: metadata is optional.
         return {}
-    data = resp.json()
-    _save(cfg, "definition", data)
-    return data
+    _check(resp, f"service definition of {cfg.service}")
+    return resp.json()
+
+
+@dataclass
+class Fetched:
+    deps: dict[str, Any]
+    member_deps: dict[str, dict[str, Any]]
+    resources: list[dict[str, Any]]
+    definition: dict[str, Any]
+
+
+def fetch_all(cfg: Config) -> Fetched:
+    """Every input of one run. Online, raw/ is replaced only after all calls succeed."""
+    fetched = Fetched(
+        deps=fetch_service_dependencies(cfg),
+        member_deps={name: fetch_service_dependencies(cfg, name) for name in cfg.include},
+        resources=fetch_resources(cfg),
+        definition=fetch_service_definition(cfg),
+    )
+    if not cfg.offline:
+        files = {"dependencies": fetched.deps, "resources": fetched.resources}
+        files.update((_dependencies_name(cfg, name), deps) for name, deps in fetched.member_deps.items())
+        if fetched.definition:
+            files["definition"] = fetched.definition
+        _replace_raw(cfg, files)
+    return fetched

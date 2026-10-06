@@ -41,11 +41,11 @@ C4 numbers these views 1, 2 and 3. This project names them L0, L1 and L2.
 
 Each run writes:
 
-- a [Structurizr DSL](https://docs.structurizr.com/dsl) workspace with all three views, which you can edit to refine the model
+- a [Structurizr DSL](https://docs.structurizr.com/dsl) workspace with all three views. The generated model and views go into two files that every run rewrites; `workspace.dsl` includes them, is created once, and is yours to edit
 - one [Mermaid C4](https://mermaid.js.org/syntax/c4.html) diagram per view, which renders on GitHub and in VS Code, and as SVG with `mmdc`
 - the raw Datadog responses, so you can generate the diagrams again with `--offline` and no API calls
 
-It is meant as a starting point for architecture documentation. Run it once, check the output, and keep `workspace.dsl` as the source you maintain.
+It is meant as a starting point for architecture documentation. Keep `workspace.dsl` as the source you maintain, and run the tool again whenever the services change: your edits survive.
 
 ## Quick Start
 
@@ -69,7 +69,7 @@ To try it without Datadog keys, download [`examples/checkout-web/`](examples/che
 datadog-structurizr -c c4.toml --offline -o .
 ```
 
-Paste the generated `workspace.dsl` into the [Structurizr DSL editor](https://structurizr.com/dsl), or open the `.mmd` files in any Mermaid viewer.
+Paste `workspace-inline.dsl` into the [Structurizr DSL editor](https://structurizr.com/dsl), which cannot read `!include`, or open the `.mmd` files in any Mermaid viewer.
 
 ## Installation
 
@@ -239,7 +239,10 @@ If the service or environment is still missing after these, the tool asks for it
 
 ```
 output/
-├── workspace.dsl            Structurizr DSL: model plus L0-SystemContext, L1-Containers, L2-Components views
+├── workspace.dsl            yours: created once, never overwritten; includes the two files below
+├── datadog-model.dsl        generated elements and relationships; rewritten every run
+├── datadog-views.dsl        generated L0-SystemContext, L1-Containers, L2-Components views; rewritten every run
+├── workspace-inline.dsl     workspace.dsl with both files pasted in, for the online DSL editor
 ├── L0-SystemContext.mmd     Mermaid C4Context
 ├── L1-Containers.mmd        Mermaid C4Container
 ├── L2-Components.mmd        Mermaid C4Component
@@ -252,6 +255,8 @@ output/
     └── definition.json                service definition, if the service has one
 ```
 
+`raw/` is replaced as a whole, and only after every Datadog call of the run has succeeded. It never mixes responses from different runs, and a failed run leaves the previous one in place. Do not keep other files in it.
+
 `raw/` holds your internal service and route names. Check it before you commit it anywhere public.
 
 ### Typical workflow
@@ -259,7 +264,7 @@ output/
 1. Copy [`examples/checkout-web/c4.toml`](examples/checkout-web/c4.toml), and set `service`, `env` and the system name.
 2. Run against Datadog once: `datadog-structurizr -c c4.toml`.
 3. Look at the SVGs. Add the services that belong to the system to `include`, move wrongly grouped dependencies with `[classify]`, and drop noise with `ignore`. Then run again with `--offline`, which makes no API calls. A service newly added to `include` needs one more online run, to fetch its dependencies.
-4. Commit `c4.toml` and `workspace.dsl` to your documentation repository. Add by hand the relationships Datadog cannot see, such as which component calls which downstream service.
+4. Add to `workspace.dsl` the elements and relationships Datadog cannot see, such as which component calls which downstream service. Commit `c4.toml`, `workspace.dsl` and the two `datadog-*.dsl` files to your documentation repository. Later runs rewrite only the `datadog-*.dsl` files.
 5. Optionally validate it with structurizr-cli, or with [`drawio-structurizr --validate`](https://github.com/veritas-sovereign/drawio-structurizr#validating-with-structurizr-cli), whose Docker image includes structurizr-cli.
 
 ### Rendering
@@ -277,9 +282,11 @@ When neither is installed, only the sources are written. The generated workspace
 
 | API | Used for | If it fails |
 | --- | --- | --- |
-| [`GET /api/v1/service_dependencies/{service}`](https://docs.datadoghq.com/api/latest/service-dependencies/) | `calls` and `called_by` of the service and of each included service: L0 and L1 | the run stops with the HTTP status, the service and Datadog's message |
-| [`POST /api/v2/spans/analytics/aggregate`](https://docs.datadoghq.com/api/latest/spans/) grouped by `resource_name` | components: L2 | a warning is printed and L2 shows one placeholder component |
-| [`GET /api/v2/services/definitions/{service}`](https://docs.datadoghq.com/api/latest/service-definition/) | description, team and languages | ignored |
+| [`GET /api/v1/service_dependencies/{service}`](https://docs.datadoghq.com/api/latest/service-dependencies/) | `calls` and `called_by` of the service and of each included service: L0 and L1 | the run stops |
+| [`POST /api/v2/spans/analytics/aggregate`](https://docs.datadoghq.com/api/latest/spans/) grouped by `resource_name` | components: L2 | the run stops. L2 shows one placeholder component only when the call succeeds and finds no indexed spans |
+| [`GET /api/v2/services/definitions/{service}`](https://docs.datadoghq.com/api/latest/service-definition/) | description, team and languages | 404 (no definition) is ignored; any other status stops the run |
+
+When a call fails, the run prints the HTTP status, the call and Datadog's message to stderr, exits with status 1, and writes no diagrams. A diagram drawn from partial data would look complete but be wrong.
 
 ### Keys and permissions
 
@@ -332,6 +339,8 @@ Element identifiers are the names with every character other than a letter, digi
 
 - **Names decide the element type** unless you classify them. Check L1, and use `[classify]` for anything in the wrong group.
 - **No component-to-dependency relationships.** Datadog does not say which entry point calls which downstream service, so L2 shows no relationships from components to other services. Add them by hand in `workspace.dsl`.
+- **Hand edits appear only in the Structurizr output.** The Mermaid diagrams are drawn from Datadog data alone.
+- **Generated identifiers can change.** Hand-written relationships refer to generated identifiers such as `checkout_web__Cart_API`. If a service or route group is renamed or disappears, structurizr-cli reports the dangling identifier, and you fix `workspace.dsl` by hand.
 - **One system per run.** Run the command once per system and merge the workspaces by hand if you need a landscape view.
 - **Layout is automatic.** Structurizr views use `autoLayout`. Mermaid's C4 layout is basic; for presentation diagrams, use the Structurizr output.
 
@@ -396,7 +405,7 @@ The package lives under `src/` so it can only be imported once installed, and so
 ### How a run works
 
 ```
-Datadog ──► client.py ──► mapper.py ──► emitter.py ──► workspace.dsl, *.mmd ──► render.py (optional)
+Datadog ──► client.py ──► mapper.py ──► emitter.py ──► datadog-*.dsl, *.mmd ──► render.py (optional)
             fetch,         dependencies    DSL and                                mmdc, structurizr-cli
             save raw/      and resources   Mermaid text
                            to C4 model

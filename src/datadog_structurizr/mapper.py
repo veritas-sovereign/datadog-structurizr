@@ -8,7 +8,7 @@ Mapping rules:
   - Components are the target's entry-point resources (span resource_name),
     HTTP routes grouped by their first meaningful path segment.
 
-Classification is name-based heuristics; edit the generated workspace.dsl or
+Classification is name-based heuristics; use [classify] in the config file or
 the hint tuples below when they guess wrong.
 """
 from __future__ import annotations

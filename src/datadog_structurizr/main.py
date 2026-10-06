@@ -6,9 +6,10 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .client import fetch_resources, fetch_service_definition, fetch_service_dependencies
+from .client import DatadogAPIError, fetch_all
 from .config import load_config
-from .emitter import emit_dsl, emit_mermaid
+from .emitter import (MODEL_FILE, VIEWS_FILE, emit_dsl_model, emit_dsl_views, emit_mermaid,
+                      emit_workspace, inline_includes)
 from .mapper import build_model
 from .render import render_mermaid, render_structurizr
 
@@ -63,20 +64,34 @@ def main(argv: list[str] | None = None) -> int:
     source = cfg.raw_dir if cfg.offline else f"Datadog ({cfg.site})"
 
     print(f"[1/4] Fetching '{cfg.service}' (env={cfg.env}) from {source}...")
-    deps = fetch_service_dependencies(cfg)
-    member_deps = {name: fetch_service_dependencies(cfg, name) for name in cfg.include}
-    resources = fetch_resources(cfg)
-    definition = fetch_service_definition(cfg)
+    try:
+        fetched = fetch_all(cfg)
+    except DatadogAPIError as exc:
+        # Nothing is written, raw/ included: a diagram from partial data looks
+        # right but is not.
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    deps, member_deps, resources = fetched.deps, fetched.member_deps, fetched.resources
     print(f"      calls={len(deps.get('calls') or [])} "
           f"called_by={len(deps.get('called_by') or [])} resources={len(resources)}"
           + (f" included={len(member_deps)}" if member_deps else ""))
 
     print("[2/4] Building C4 model...")
-    model = build_model(deps, resources, definition, cfg, member_deps)
+    model = build_model(deps, resources, fetched.definition, cfg, member_deps)
 
     print("[3/4] Writing Structurizr DSL and Mermaid sources...")
-    dsl_path = cfg.output_dir / "workspace.dsl"
-    dsl_path.write_text(emit_dsl(model), encoding="utf-8")
+    out = cfg.output_dir
+    (out / MODEL_FILE).write_text(emit_dsl_model(model), encoding="utf-8")
+    (out / VIEWS_FILE).write_text(emit_dsl_views(model), encoding="utf-8")
+    dsl_path = out / "workspace.dsl"
+    if not dsl_path.exists():
+        dsl_path.write_text(emit_workspace(model), encoding="utf-8")
+        print(f"      created {dsl_path.name}; it is yours to edit and is never overwritten")
+    elif MODEL_FILE not in dsl_path.read_text(encoding="utf-8"):
+        print(f"      warning: {dsl_path.name} does not !include {MODEL_FILE}, so it does not "
+              "show this run. Add the includes, or delete it to have it created again.")
+    inline_path = out / "workspace-inline.dsl"
+    inline_path.write_text(inline_includes(dsl_path.read_text(encoding="utf-8"), out), encoding="utf-8")
     mmd_files = []
     for view, text in emit_mermaid(model).items():
         path = cfg.output_dir / f"{view}.mmd"
@@ -91,7 +106,8 @@ def main(argv: list[str] | None = None) -> int:
         images = render_mermaid(mmd_files) + render_structurizr(dsl_path, cfg.output_dir)
 
     print("\nDone. Outputs:")
-    print(f"  DSL : {dsl_path}")
+    print(f"  DSL : {dsl_path} (includes {MODEL_FILE}, {VIEWS_FILE})")
+    print(f"  DSL : {inline_path} (single file for the online DSL editor)")
     for p in mmd_files:
         print(f"  MMD : {p}")
     for p in images:

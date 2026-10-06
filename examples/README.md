@@ -19,6 +19,6 @@ To see what the inputs change, run it without the config file and compare the vi
 datadog-structurizr --service checkout-web --env prod --offline -o .
 ```
 
-Both write `workspace.dsl`, `L0-SystemContext.mmd`, `L1-Containers.mmd` and `L2-Components.mmd`, and an `.svg` for each view if `mmdc` is installed. Generated files are git-ignored. Only `c4.toml` and `raw/` are checked in.
+Both write `workspace.dsl` (only if missing), `datadog-model.dsl`, `datadog-views.dsl`, `workspace-inline.dsl`, `L0-SystemContext.mmd`, `L1-Containers.mmd` and `L2-Components.mmd`, and an `.svg` for each view if `mmdc` is installed. Generated files are git-ignored. Only `c4.toml` and `raw/` are checked in.
 
 To make your own sample, run once against Datadog and copy `<output>/raw/`. Check the copied files for internal service and route names before you commit them.
