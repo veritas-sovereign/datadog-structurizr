@@ -218,10 +218,10 @@ def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
     description, tech = _container_meta(meta)
     keys = _Keys()
 
-    person = (Element(keys(cfg.person_name, "user"), cfg.person_name, "person", cfg.person_description)
+    person = (Element(keys(f"the person {cfg.person_name}", "user"), cfg.person_name, "person", cfg.person_description)
               if cfg.person_enabled else None)
     system_name = cfg.system_name or target
-    system = Element(keys(system_name, f"{_key(system_name)}_system"), system_name, "system",
+    system = Element(keys(f"the system {system_name}", f"{_key(system_name)}_system"), system_name, "system",
                      cfg.system_description or meta["description"] or f"System containing {target}.")
     container = Element(keys(target), target, "container", description,
                         technology=tech, parent_key=system.key)

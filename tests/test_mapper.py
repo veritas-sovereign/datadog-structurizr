@@ -223,6 +223,7 @@ def test_service_named_like_the_person_is_not_the_person(offline_cfg):
     m = _model(offline_cfg, calls=["user"])
     assert m.person and m.person.key == "user"
     assert [(s.name, s.key) for s in m.systems] == [("user", "user_2")]
+    assert m.warnings == ["'user' and 'the person User' both make the identifier user; 'user' is user_2"]
     assert ("checkout_web", "user_2") in {(r.source_key, r.target_key) for r in m.relationships}
 
 
