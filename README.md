@@ -375,6 +375,8 @@ The span types come from one spans aggregate over the neighbouring services, gro
 
 The hints are matched case-insensitively, and `db` must be a whole word, so `feedback-service` is not a datastore. The hint lists are in [`mapper.py`](src/datadog_structurizr/mapper.py). Use `[classify]` rather than editing them.
 
+Each dependency records the rule that placed it, as a `Classified by` property in `datadog-model.dsl`: for example `[classify] datastores pattern ledger`, `span type redis`, `span type http and name hint stripe`, `name hint db`, or `no span type or name hint matched`. Included services have `[system] include`. Structurizr shows properties in its element details; they are not drawn, and the Mermaid files leave them out. When a dependency is in the wrong group, the property says whether to fix it with `[classify]` or whether Datadog recorded an unexpected span type.
+
 The person (`User` by default) uses the service over HTTPS. It appears in L0, L1 and L2 unless it is turned off.
 
 A service that calls itself gets no relationship. Relationships between containers of the target system appear in L1 and are hidden in L0, where they are inside the system.

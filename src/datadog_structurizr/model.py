@@ -23,6 +23,7 @@ class Element:
     external: bool = False      # outside the organisation (SaaS, cloud API)
     database: bool = False      # rendered with the datastore shape
     parent_key: str | None = None
+    basis: str = ""             # why a dependency got its kind: config, span type or name hint
     children: list["Element"] = field(default_factory=list)
 
 

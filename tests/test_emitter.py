@@ -98,3 +98,16 @@ def test_inline_includes_pastes_only_generated_fragments(tmp_path):
     assert '        a = person "A"' in flat
     assert "        styles {\n        }" in flat
     assert "!include mine.dsl" in flat and "!include datadog" not in flat
+
+
+def test_dsl_writes_the_classification_reason_as_a_property(offline_cfg):
+    dsl = emit_dsl_model(_model(offline_cfg))
+    assert ('stripe_api = softwareSystem "stripe-api" "External service." "External" {\n'
+            '    properties {\n'
+            '        "Classified by" "name hint stripe"\n'
+            '    }\n'
+            '}\n') in dsl
+    assert ('        tags "Database"\n'
+            '        properties {\n'
+            '            "Classified by" "name hint postgres"\n') in dsl
+    assert 'checkout_web = container "checkout-web" "Application container." "APM service" {\n        checkout_web__' in dsl
