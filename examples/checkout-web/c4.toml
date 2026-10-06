@@ -1,0 +1,29 @@
+# Inputs for datadog-structurizr --config c4.toml
+# Datadog keys never go here: set DD_API_KEY and DD_APP_KEY in the environment.
+
+service = "checkout-web"
+env = "prod"
+hours = 24
+# site = "datadoghq.eu"
+# output = "c4"
+
+# Services left out of every diagram (fnmatch globs, case-insensitive)
+ignore = ["otel-collector", "datadog-agent*"]
+
+[system]
+name = "Checkout"
+description = "Lets shoppers review their cart and pay."
+# Other APM services that are containers of this system (exact names).
+# Each one costs one extra dependencies API call.
+include = ["checkout-worker"]
+
+[person]
+enabled = true
+name = "Shopper"
+description = "Buys products on the web shop."
+
+# Overrides for the name hints (fnmatch globs, case-insensitive)
+[classify]
+datastores = ["ledger"]
+external = []
+internal = []

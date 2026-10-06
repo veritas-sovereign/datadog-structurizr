@@ -1,0 +1,9 @@
+{
+  "name": "checkout-worker",
+  "calls": [
+    "checkout-postgres",
+    "aws.sqs",
+    "otel-collector"
+  ],
+  "called_by": []
+}

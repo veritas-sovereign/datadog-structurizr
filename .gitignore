@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+
+# Credentials (.env.example is the committed template)
+.env
+.env.*
+!.env.example
+
+# Generated output (c4.toml and raw/*.json in examples/ are checked in)
+/output/
+examples/*/*.dsl
+examples/*/*.mmd
+examples/*/*.svg
+examples/*/plantuml/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# macOS
+.DS_Store

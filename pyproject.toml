@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "datadog-structurizr"
+version = "0.1.0"
+description = "Generate C4 system context, container and component diagrams of a Datadog APM service as Structurizr DSL and Mermaid."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Amit Kumar" }]
+requires-python = ">=3.9"
+keywords = ["c4", "c4-model", "datadog", "apm", "structurizr", "mermaid", "architecture", "diagrams"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Documentation",
+]
+dependencies = [
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+    "tomli>=1.1; python_version < \"3.11\"",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://github.com/veritas-sovereign/datadog-structurizr"
+Changelog = "https://github.com/veritas-sovereign/datadog-structurizr/blob/main/CHANGELOG.md"
+
+[project.scripts]
+datadog-structurizr = "datadog_structurizr.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

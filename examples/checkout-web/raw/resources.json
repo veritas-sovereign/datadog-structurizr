@@ -1,0 +1,26 @@
+[
+  {
+    "resource": "GET /api/v1/cart/{id}",
+    "hits": 9100
+  },
+  {
+    "resource": "POST /api/v1/cart/items",
+    "hits": 4200
+  },
+  {
+    "resource": "POST /api/v1/checkout",
+    "hits": 3100
+  },
+  {
+    "resource": "GET /api/v1/checkout/{id}/status",
+    "hits": 800
+  },
+  {
+    "resource": "GET /health",
+    "hits": 20000
+  },
+  {
+    "resource": "order.created consume",
+    "hits": 1500
+  }
+]

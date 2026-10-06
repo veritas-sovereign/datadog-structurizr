@@ -1,0 +1,157 @@
+"""Write the C4 model as a Structurizr DSL workspace and as Mermaid C4 diagrams."""
+from __future__ import annotations
+
+from .model import C4Model, Element
+
+# --------------------------------------------------------------------------
+# Structurizr DSL
+# --------------------------------------------------------------------------
+
+def _q(text: str) -> str:
+    return '"' + text.replace("\\", "\\\\").replace('"', "'") + '"'
+
+
+def emit_dsl(model: C4Model) -> str:
+    lines: list[str] = []
+    w = lines.append
+    w(f"workspace {_q(model.name)} {_q(model.description)} {{")
+    w("")
+    w("    model {")
+    p = model.person
+    if p:
+        w(f"        {p.key} = person {_q(p.name)} {_q(p.description)}")
+        w("")
+    s = model.target_system
+    w(f"        {s.key} = softwareSystem {_q(s.name)} {_q(s.description)} {{")
+    for c in s.children:
+        w(f"            {c.key} = container {_q(c.name)} {_q(c.description)} {_q(c.technology)} {{")
+        if c.database:
+            w('                tags "Database"')
+        for comp in c.children:
+            w(f"                {comp.key} = component {_q(comp.name)} {_q(comp.description)} {_q(comp.technology)}")
+        w("            }")
+    w("        }")
+    w("")
+    for e in model.systems:
+        tag = "External" if e.external else "Internal Service"
+        w(f"        {e.key} = softwareSystem {_q(e.name)} {_q(e.description)} {_q(tag)}")
+    w("")
+    for r in model.relationships:
+        tech = f" {_q(r.technology)}" if r.technology else ""
+        w(f"        {r.source_key} -> {r.target_key} {_q(r.description)}{tech}")
+    w("    }")
+    w("")
+    w("    views {")
+    w(f'        systemContext {s.key} "L0-SystemContext" {{')
+    w("            include *")
+    w("            autolayout lr")
+    w("        }")
+    w(f'        container {s.key} "L1-Containers" {{')
+    w("            include *")
+    w("            autolayout lr")
+    w("        }")
+    w(f'        component {model.target_container.key} "L2-Components" {{')
+    w("            include *")
+    w("            autolayout lr")
+    w("        }")
+    w("        styles {")
+    for tag, props in (("Person", ["shape Person"]),
+                       ("Database", ["shape Cylinder"]),
+                       ("External", ["background #999999", "color #ffffff"])):
+        w(f'            element "{tag}" {{')
+        for prop in props:
+            w(f"                {prop}")
+        w("            }")
+    w("        }")
+    w("    }")
+    w("}")
+    return "\n".join(lines) + "\n"
+
+
+# --------------------------------------------------------------------------
+# Mermaid C4 (renders with mmdc, GitHub, VS Code - no Java)
+# --------------------------------------------------------------------------
+
+def _m(text: str) -> str:
+    return '"' + text.replace('"', "'") + '"'
+
+
+def _owner(key: str, model: C4Model, level: str) -> str | None:
+    """Map an element key onto the element shown at this diagram level."""
+    s, c = model.target_system, model.target_container
+    if (model.person and key == model.person.key) or any(e.key == key for e in model.systems):
+        return key
+    if level == "L0":
+        return s.key
+    if any(x.key == key for x in s.children):
+        return key
+    if any(x.key == key for x in c.children):
+        return key if level == "L2" else c.key
+    return None
+
+
+def _system_line(e: Element) -> str:
+    fn = "System_Ext" if e.external else "System"
+    return f"    {fn}({e.key}, {_m(e.name)}, {_m(e.description)})"
+
+
+def _container_line(x: Element) -> str:
+    fn = "ContainerDb" if x.database else "Container"
+    return f"    {fn}({x.key}, {_m(x.name)}, {_m(x.technology)}, {_m(x.description)})"
+
+
+def _rels(model: C4Model, level: str, visible: set[str]) -> list[str]:
+    seen: set[tuple[str, str]] = set()
+    out = []
+    for r in model.relationships:
+        a, b = _owner(r.source_key, model, level), _owner(r.target_key, model, level)
+        if not a or not b or a == b or (a, b) in seen or a not in visible or b not in visible:
+            continue
+        seen.add((a, b))
+        out.append(f"    Rel({a}, {b}, {_m(r.description)}"
+                   + (f", {_m(r.technology)})" if r.technology else ")"))
+    return out
+
+
+def emit_mermaid(model: C4Model) -> dict[str, str]:
+    p, s, c = model.person, model.target_system, model.target_container
+    person_line = [f"    Person({p.key}, {_m(p.name)}, {_m(p.description)})"] if p else []
+    person_keys = {p.key} if p else set()
+
+    # L0 - System Context
+    l0 = ["C4Context", f"    title L0 System Context - {s.name}", *person_line,
+          f"    System({s.key}, {_m(s.name)}, {_m(s.description)})"]
+    l0 += [_system_line(e) for e in model.systems]
+    l0 += _rels(model, "L0", {*person_keys, s.key, *(e.key for e in model.systems)})
+
+    # L1 - Containers
+    l1 = ["C4Container", f"    title L1 Containers - {s.name}", *person_line,
+          f"    System_Boundary({s.key}, {_m(s.name)}) {{"]
+    l1 += [_container_line(x) for x in s.children]
+    l1.append("    }")
+    l1 += [_system_line(e) for e in model.systems]
+    l1 += _rels(model, "L1", {*person_keys, *(x.key for x in s.children), *(e.key for e in model.systems)})
+
+    # L2 - Components (only elements with a relationship to a component)
+    comp_keys = {x.key for x in c.children}
+    related = {k for r in model.relationships for k in (r.source_key, r.target_key)
+               if r.source_key in comp_keys or r.target_key in comp_keys} - comp_keys
+    l2 = ["C4Component", f"    title L2 Components - {c.name}"]
+    if person_keys & related:
+        l2 += person_line
+    l2.append(f"    Container_Boundary({c.key}, {_m(c.name)}) {{")
+    for x in c.children:
+        l2.append(f"    Component({x.key}, {_m(x.name)}, {_m(x.technology)}, {_m(x.description)})")
+    l2.append("    }")
+    l2 += [_system_line(e) for e in model.systems if e.key in related]
+    l2 += [_container_line(x) for x in s.children if x.key in related]
+    l2 += _rels(model, "L2", comp_keys | related)
+
+    layout = '    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")'
+    for diagram in (l0, l1, l2):
+        diagram.append(layout)
+    return {
+        "L0-SystemContext": "\n".join(l0) + "\n",
+        "L1-Containers": "\n".join(l1) + "\n",
+        "L2-Components": "\n".join(l2) + "\n",
+    }

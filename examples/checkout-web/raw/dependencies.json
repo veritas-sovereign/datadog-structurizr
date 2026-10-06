@@ -1,0 +1,17 @@
+{
+  "name": "checkout-web",
+  "calls": [
+    "cart-service",
+    "payment-service",
+    "checkout-postgres",
+    "redis",
+    "stripe-api",
+    "aws.sqs",
+    "ledger",
+    "otel-collector"
+  ],
+  "called_by": [
+    "api-gateway",
+    "mobile-bff"
+  ]
+}
