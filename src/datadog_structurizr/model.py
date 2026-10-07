@@ -13,6 +13,21 @@ from typing import Literal
 ElementKind = Literal["person", "system", "container", "component"]
 
 
+@dataclass(frozen=True)
+class Evidence:
+    """Where an element or relationship came from: the Datadog call that returned it
+    (named by the API call, not a file, so it holds with --no-raw too), or
+    "assumption" for what the tool draws without Datadog data."""
+    source: str
+    detail: str
+
+
+def _add(evidence: list[Evidence], source: str, detail: str) -> None:
+    item = Evidence(source, detail)
+    if item not in evidence:
+        evidence.append(item)
+
+
 @dataclass
 class Element:
     key: str                    # unique identifier (letters, digits, underscore)
@@ -25,6 +40,10 @@ class Element:
     parent_key: str | None = None
     basis: str = ""             # why a dependency got its kind: config, span type or name hint
     children: list[Element] = field(default_factory=list)
+    evidence: list[Evidence] = field(default_factory=list)
+
+    def cite(self, source: str, detail: str) -> None:
+        _add(self.evidence, source, detail)
 
 
 @dataclass
@@ -33,6 +52,10 @@ class Relationship:
     target_key: str
     description: str = ""
     technology: str = ""
+    evidence: list[Evidence] = field(default_factory=list)
+
+    def cite(self, source: str, detail: str) -> None:
+        _add(self.evidence, source, detail)
 
 
 @dataclass
@@ -46,11 +69,16 @@ class C4Model:
     relationships: list[Relationship] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)  # printed by the CLI, not drawn
 
-    def relate(self, source: str, target: str, description: str, technology: str = "") -> None:
+    def relate(self, source: str, target: str, description: str, technology: str = "") -> Relationship | None:
+        """The relationship from source to target, added on first sight; None for a self-call."""
         if source == target:  # a service calling itself is not an architectural edge
-            return
-        if not any(r.source_key == source and r.target_key == target for r in self.relationships):
-            self.relationships.append(Relationship(source, target, description, technology))
+            return None
+        for r in self.relationships:
+            if r.source_key == source and r.target_key == target:
+                return r
+        r = Relationship(source, target, description, technology)
+        self.relationships.append(r)
+        return r
 
     def all_elements(self) -> list[Element]:
         out = [e for e in (self.person, self.target_system) if e] + self.systems

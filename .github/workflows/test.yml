@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.13"]
+        python-version: ["3.11", "3.14"]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -25,8 +25,9 @@ jobs:
       - name: Run the example offline
         run: |
           cd examples
-          datadog-structurizr --service checkout-web --env prod --offline -o checkout-web --no-render
+          datadog-structurizr --service checkout-web --env prod --offline -o checkout-web --no-render --json
           test -s checkout-web/workspace.dsl
+          test -s checkout-web/c4-model.json
           ls checkout-web/*.mmd
 
   lint:
@@ -107,9 +108,9 @@ jobs:
           out="$RUNNER_TEMP/c4"
           cp -r examples/checkout-web "$out"
           docker run --rm --user "$(id -u):$(id -g)" -v "$out:/work" \
-            datadog-structurizr:ci -c c4.toml --offline -o . --no-render
+            datadog-structurizr:ci -c c4.toml --offline -o . --no-render --json
           for f in workspace.dsl datadog-model.dsl datadog-views.dsl workspace-inline.dsl \
-                   L0-SystemContext.mmd L1-Containers.mmd L2-Components.mmd; do
+                   L0-SystemContext.mmd L1-Containers.mmd L2-Components.mmd c4-model.json; do
             test -s "$out/$f" || { echo "missing or empty: $f"; exit 1; }
           done
           grep -q 'checkout_worker = container "checkout-worker"' "$out/datadog-model.dsl"

@@ -1,0 +1,504 @@
+{
+  "schema_version": 1,
+  "generator": {
+    "name": "datadog-structurizr",
+    "version": "*"
+  },
+  "source": {
+    "service": "checkout-web",
+    "env": "prod",
+    "lookback_hours": 24,
+    "site": "datadoghq.com"
+  },
+  "name": "Checkout - C4",
+  "description": "Generated from Datadog APM (prod, last 24h); owner team: payments",
+  "elements": [
+    {
+      "key": "Checkout_system",
+      "name": "Checkout",
+      "kind": "system",
+      "parent": null,
+      "description": "Lets shoppers review their cart and pay.",
+      "technology": "",
+      "external": false,
+      "database": false,
+      "classified_by": null,
+      "evidence": [
+        {
+          "source": "assumption",
+          "detail": "system boundary from [system] in the config, or the target service's name"
+        }
+      ]
+    },
+    {
+      "key": "api_gateway",
+      "name": "api-gateway",
+      "kind": "system",
+      "parent": null,
+      "description": "Internal service observed in APM.",
+      "technology": "",
+      "external": false,
+      "database": false,
+      "classified_by": "span type web",
+      "evidence": [
+        {
+          "source": "POST /api/v2/spans/analytics/aggregate by service and type",
+          "detail": "span types web 52000, http 48000"
+        },
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "called_by"
+        }
+      ]
+    },
+    {
+      "key": "aws_sqs",
+      "name": "aws.sqs",
+      "kind": "system",
+      "parent": null,
+      "description": "External service.",
+      "technology": "",
+      "external": true,
+      "database": false,
+      "classified_by": "name hint aws.",
+      "evidence": [
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "calls"
+        },
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-worker",
+          "detail": "calls"
+        }
+      ]
+    },
+    {
+      "key": "cart_service",
+      "name": "cart-service",
+      "kind": "system",
+      "parent": null,
+      "description": "Internal service observed in APM.",
+      "technology": "",
+      "external": false,
+      "database": false,
+      "classified_by": "span type web",
+      "evidence": [
+        {
+          "source": "POST /api/v2/spans/analytics/aggregate by service and type",
+          "detail": "span types web 30500, http 12100, untyped 900"
+        },
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "calls"
+        }
+      ]
+    },
+    {
+      "key": "checkout_postgres",
+      "name": "checkout-postgres",
+      "kind": "container",
+      "parent": "Checkout_system",
+      "description": "Datastore used by the system.",
+      "technology": "sql",
+      "external": false,
+      "database": true,
+      "classified_by": "span type sql",
+      "evidence": [
+        {
+          "source": "POST /api/v2/spans/analytics/aggregate by service and type",
+          "detail": "span types sql 88000"
+        },
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "calls"
+        },
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-worker",
+          "detail": "calls"
+        }
+      ]
+    },
+    {
+      "key": "checkout_web",
+      "name": "checkout-web",
+      "kind": "container",
+      "parent": "Checkout_system",
+      "description": "Checkout web front end",
+      "technology": "node",
+      "external": false,
+      "database": false,
+      "classified_by": null,
+      "evidence": [
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "dependencies of the target service"
+        },
+        {
+          "source": "GET /api/v2/services/definitions/checkout-web",
+          "detail": "description, languages, team"
+        }
+      ]
+    },
+    {
+      "key": "checkout_web__Cart_API",
+      "name": "Cart API",
+      "kind": "component",
+      "parent": "checkout_web",
+      "description": "GET /api/v1/cart/{id}; POST /api/v1/cart/items - 13300 spans",
+      "technology": "HTTP endpoint group",
+      "external": false,
+      "database": false,
+      "classified_by": null,
+      "evidence": [
+        {
+          "source": "POST /api/v2/spans/analytics/aggregate by resource_name of checkout-web",
+          "detail": "2 resources, 13300 spans"
+        }
+      ]
+    },
+    {
+      "key": "checkout_web__Checkout_API",
+      "name": "Checkout API",
+      "kind": "component",
+      "parent": "checkout_web",
+      "description": "POST /api/v1/checkout; GET /api/v1/checkout/{id}/status - 3900 spans",
+      "technology": "HTTP endpoint group",
+      "external": false,
+      "database": false,
+      "classified_by": null,
+      "evidence": [
+        {
+          "source": "POST /api/v2/spans/analytics/aggregate by resource_name of checkout-web",
+          "detail": "2 resources, 3900 spans"
+        }
+      ]
+    },
+    {
+      "key": "checkout_web__order_created_consume",
+      "name": "order.created consume",
+      "kind": "component",
+      "parent": "checkout_web",
+      "description": "order.created consume - 1500 spans",
+      "technology": "Entry point",
+      "external": false,
+      "database": false,
+      "classified_by": null,
+      "evidence": [
+        {
+          "source": "POST /api/v2/spans/analytics/aggregate by resource_name of checkout-web",
+          "detail": "1 resource, 1500 spans"
+        }
+      ]
+    },
+    {
+      "key": "checkout_worker",
+      "name": "checkout-worker",
+      "kind": "container",
+      "parent": "Checkout_system",
+      "description": "Container of the system observed in APM.",
+      "technology": "APM service",
+      "external": false,
+      "database": false,
+      "classified_by": "[system] include",
+      "evidence": [
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-worker",
+          "detail": "dependencies of the included service"
+        }
+      ]
+    },
+    {
+      "key": "ledger",
+      "name": "ledger",
+      "kind": "container",
+      "parent": "Checkout_system",
+      "description": "Datastore used by the system.",
+      "technology": "sql",
+      "external": false,
+      "database": true,
+      "classified_by": "[classify] datastores pattern ledger",
+      "evidence": [
+        {
+          "source": "POST /api/v2/spans/analytics/aggregate by service and type",
+          "detail": "span types sql 4100"
+        },
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "calls"
+        }
+      ]
+    },
+    {
+      "key": "mobile_bff",
+      "name": "mobile-bff",
+      "kind": "system",
+      "parent": null,
+      "description": "Internal service observed in APM.",
+      "technology": "",
+      "external": false,
+      "database": false,
+      "classified_by": "span type web",
+      "evidence": [
+        {
+          "source": "POST /api/v2/spans/analytics/aggregate by service and type",
+          "detail": "span types web 9100, http 8800"
+        },
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "called_by"
+        }
+      ]
+    },
+    {
+      "key": "payment_service",
+      "name": "payment-service",
+      "kind": "system",
+      "parent": null,
+      "description": "Internal service observed in APM.",
+      "technology": "",
+      "external": false,
+      "database": false,
+      "classified_by": "span type web",
+      "evidence": [
+        {
+          "source": "POST /api/v2/spans/analytics/aggregate by service and type",
+          "detail": "span types web 12500, http 6400"
+        },
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "calls"
+        }
+      ]
+    },
+    {
+      "key": "redis",
+      "name": "redis",
+      "kind": "container",
+      "parent": "Checkout_system",
+      "description": "Datastore used by the system.",
+      "technology": "redis",
+      "external": false,
+      "database": true,
+      "classified_by": "span type redis",
+      "evidence": [
+        {
+          "source": "POST /api/v2/spans/analytics/aggregate by service and type",
+          "detail": "span types redis 41000"
+        },
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "calls"
+        }
+      ]
+    },
+    {
+      "key": "stripe_api",
+      "name": "stripe-api",
+      "kind": "system",
+      "parent": null,
+      "description": "External service.",
+      "technology": "",
+      "external": true,
+      "database": false,
+      "classified_by": "span type http and name hint stripe",
+      "evidence": [
+        {
+          "source": "POST /api/v2/spans/analytics/aggregate by service and type",
+          "detail": "span types http 3900"
+        },
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "calls"
+        }
+      ]
+    },
+    {
+      "key": "user",
+      "name": "Shopper",
+      "kind": "person",
+      "parent": null,
+      "description": "Buys products on the web shop.",
+      "technology": "",
+      "external": false,
+      "database": false,
+      "classified_by": null,
+      "evidence": [
+        {
+          "source": "assumption",
+          "detail": "[person] in the config, or the default person"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "source": "api_gateway",
+      "target": "checkout_web",
+      "description": "Calls",
+      "technology": "",
+      "evidence": [
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "called_by"
+        }
+      ]
+    },
+    {
+      "source": "checkout_web",
+      "target": "aws_sqs",
+      "description": "Calls",
+      "technology": "",
+      "evidence": [
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "calls"
+        }
+      ]
+    },
+    {
+      "source": "checkout_web",
+      "target": "cart_service",
+      "description": "Calls",
+      "technology": "",
+      "evidence": [
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "calls"
+        }
+      ]
+    },
+    {
+      "source": "checkout_web",
+      "target": "checkout_postgres",
+      "description": "Calls",
+      "technology": "",
+      "evidence": [
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "calls"
+        }
+      ]
+    },
+    {
+      "source": "checkout_web",
+      "target": "ledger",
+      "description": "Calls",
+      "technology": "",
+      "evidence": [
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "calls"
+        }
+      ]
+    },
+    {
+      "source": "checkout_web",
+      "target": "payment_service",
+      "description": "Calls",
+      "technology": "",
+      "evidence": [
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "calls"
+        }
+      ]
+    },
+    {
+      "source": "checkout_web",
+      "target": "redis",
+      "description": "Calls",
+      "technology": "",
+      "evidence": [
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "calls"
+        }
+      ]
+    },
+    {
+      "source": "checkout_web",
+      "target": "stripe_api",
+      "description": "Calls",
+      "technology": "",
+      "evidence": [
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "calls"
+        }
+      ]
+    },
+    {
+      "source": "checkout_worker",
+      "target": "aws_sqs",
+      "description": "Calls",
+      "technology": "",
+      "evidence": [
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-worker",
+          "detail": "calls"
+        }
+      ]
+    },
+    {
+      "source": "checkout_worker",
+      "target": "checkout_postgres",
+      "description": "Calls",
+      "technology": "",
+      "evidence": [
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-worker",
+          "detail": "calls"
+        }
+      ]
+    },
+    {
+      "source": "mobile_bff",
+      "target": "checkout_web",
+      "description": "Calls",
+      "technology": "",
+      "evidence": [
+        {
+          "source": "GET /api/v1/service_dependencies/checkout-web",
+          "detail": "called_by"
+        }
+      ]
+    },
+    {
+      "source": "user",
+      "target": "checkout_web",
+      "description": "Uses",
+      "technology": "HTTPS",
+      "evidence": [
+        {
+          "source": "assumption",
+          "detail": "the person uses the target service"
+        }
+      ]
+    },
+    {
+      "source": "user",
+      "target": "checkout_web__Cart_API",
+      "description": "Calls",
+      "technology": "HTTPS",
+      "evidence": [
+        {
+          "source": "assumption",
+          "detail": "the person is drawn calling every HTTP endpoint group"
+        }
+      ]
+    },
+    {
+      "source": "user",
+      "target": "checkout_web__Checkout_API",
+      "description": "Calls",
+      "technology": "HTTPS",
+      "evidence": [
+        {
+          "source": "assumption",
+          "detail": "the person is drawn calling every HTTP endpoint group"
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}

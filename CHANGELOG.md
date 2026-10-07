@@ -5,6 +5,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- `--json` writes `c4-model.json`: every element and relationship of the model, sorted and with no timestamp, so runs on the same data write the same file. Its format is `schema/c4-model.schema.json`, versioned by `schema_version`.
+- Each element and relationship in `c4-model.json` has an `evidence` list: the Datadog call it came from (`GET /api/v1/service_dependencies/checkout-web`, `calls`), or `assumption` for what the tool draws without Datadog data, such as the person and its relationships.
+- `ROADMAP.md` lists the planned work and what is left out on purpose: confidence scores, Pydantic and a graph database.
+
+### Changed
+
+- Python 3.11 or later is required. Python 3.10 reaches end of life in October 2026. `tomli` is no longer a dependency.
+
 ## [0.3.0] - 2026-10-06
 
 ### Changed

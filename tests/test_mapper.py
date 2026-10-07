@@ -302,3 +302,35 @@ def test_each_dependency_records_why_it_got_its_kind(offline_cfg):
         "checkout-worker": "[system] include",
     }
     assert m.person and not m.person.basis and not m.target_container.basis
+
+
+def test_evidence_without_a_person_or_resources(offline_cfg):
+    cfg = _cfg(offline_cfg, person_enabled=False)
+    m = build_model({"calls": ["cart-service", "cart-service"], "called_by": ["api-gateway"]}, [], {}, cfg)
+    [cart] = [s for s in m.systems if s.name == "cart-service"]
+    assert [(e.source, e.detail) for e in cart.evidence] == [
+        ("GET /api/v1/service_dependencies/checkout-web", "calls")]
+    [placeholder] = m.target_container.children
+    assert [(e.source, e.detail) for e in placeholder.evidence] == [
+        ("assumption", "placeholder: no entry-point resources were found")]
+
+
+def test_component_callers_are_marked_as_an_assumption(offline_cfg):
+    cfg = _cfg(offline_cfg, person_enabled=False)
+    m = build_model({"called_by": ["api-gateway"]}, [{"resource": "GET /cart", "hits": 3}], {}, cfg)
+    rel = next(r for r in m.relationships if r.target_key == "checkout_web__Cart_API")
+    assert rel.source_key == "api_gateway"
+    assert [(e.source, e.detail) for e in rel.evidence] == [
+        ("assumption", "services calling checkout-web are drawn calling every HTTP endpoint group")]
+
+
+def test_every_element_and_relationship_has_evidence(offline_cfg):
+    cfg = _cfg(offline_cfg, include=("checkout-worker",))
+    m = build_model({"calls": ["redis", "checkout-worker"], "called_by": ["api-gateway"]},
+                    [{"resource": "GET /cart", "hits": 1}],
+                    {"data": {"attributes": {"schema": {"team": "payments"}}}}, cfg,
+                    {"checkout-worker": {"calls": ["redis"], "called_by": []}}, types={"redis": {"redis": 5}})
+    assert all(e.evidence for e in m.all_elements())
+    assert all(r.evidence for r in m.relationships)
+    assert ("GET /api/v2/services/definitions/checkout-web", "team") in {
+        (e.source, e.detail) for e in m.target_container.evidence}

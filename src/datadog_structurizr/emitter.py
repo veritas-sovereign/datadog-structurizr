@@ -1,9 +1,12 @@
-"""Write the C4 model as a Structurizr DSL workspace and as Mermaid C4 diagrams."""
+"""Write the C4 model as a Structurizr DSL workspace, as Mermaid C4 diagrams and as JSON."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from typing import Any
 
-from .model import C4Model, Element
+from . import __version__
+from .model import C4Model, Element, Evidence
 
 # --------------------------------------------------------------------------
 # Structurizr DSL
@@ -222,3 +225,54 @@ def emit_mermaid(model: C4Model) -> dict[str, str]:
         "L1-Containers": "\n".join(l1) + "\n",
         "L2-Components": "\n".join(l2) + "\n",
     }
+
+
+# --------------------------------------------------------------------------
+# JSON (--json): the model for other tools; schema/c4-model.schema.json
+# --------------------------------------------------------------------------
+
+JSON_FILE = "c4-model.json"
+# Raised on any change that can break a reader: a field removed, renamed or
+# given another meaning. Adding a field does not raise it.
+SCHEMA_VERSION = 1
+
+
+def _evidence(items: list[Evidence]) -> list[dict[str, str]]:
+    return [{"source": e.source, "detail": e.detail} for e in items]
+
+
+def emit_json(model: C4Model, source: dict[str, Any]) -> str:
+    """The model as JSON, sorted by identifier and with no timestamp, so two runs on
+    the same Datadog data write the same file.
+
+    source: the service, env, lookback window and site the data came from.
+    """
+    elements = [
+        {
+            "key": e.key, "name": e.name, "kind": e.kind, "parent": e.parent_key,
+            "description": e.description, "technology": e.technology,
+            "external": e.external, "database": e.database,
+            "classified_by": e.basis or None,
+            "evidence": _evidence(e.evidence),
+        }
+        for e in sorted(model.all_elements(), key=lambda e: e.key)
+    ]
+    relationships = [
+        {
+            "source": r.source_key, "target": r.target_key,
+            "description": r.description, "technology": r.technology,
+            "evidence": _evidence(r.evidence),
+        }
+        for r in sorted(model.relationships, key=lambda r: (r.source_key, r.target_key))
+    ]
+    document = {
+        "schema_version": SCHEMA_VERSION,
+        "generator": {"name": "datadog-structurizr", "version": __version__},
+        "source": source,
+        "name": model.name,
+        "description": model.description,
+        "elements": elements,
+        "relationships": relationships,
+        "warnings": model.warnings,
+    }
+    return json.dumps(document, indent=2, ensure_ascii=False) + "\n"

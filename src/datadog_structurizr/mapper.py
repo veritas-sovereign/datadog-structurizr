@@ -59,6 +59,28 @@ _PROBE_LAST = re.compile(r"^([\w.-]*health|healthz|healthcheck|ready|readyz|live
 _STATIC_RE = re.compile(r"\.(m?js|css|map|png|jpe?g|gif|svg|ico|webp|avif|woff2?|ttf|eot|html?|txt)"
                         r"(\.(br|gz))?$", re.IGNORECASE)
 
+# Evidence sources: the Datadog call each part of the model came from.
+ASSUMPTION = "assumption"
+TYPES_CALL = "POST /api/v2/spans/analytics/aggregate by service and type"
+
+
+def _deps_call(service: str) -> str:
+    return f"GET /api/v1/service_dependencies/{service}"
+
+
+def _resources_call(service: str) -> str:
+    return f"POST /api/v2/spans/analytics/aggregate by resource_name of {service}"
+
+
+def _definition_call(service: str) -> str:
+    return f"GET /api/v2/services/definitions/{service}"
+
+
+def _type_counts(counts: dict[str, int]) -> str:
+    ranked = sorted(counts.items(), key=lambda tn: (-tn[1], tn[0]))
+    return "span types " + ", ".join(f"{t or 'untyped'} {n}" for t, n in ranked)
+
+
 _HTTP_RE = re.compile(r"^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)(?:\s+(\S+))?$", re.IGNORECASE)
 _NOISE_SEGMENT = re.compile(r"^(api|v\d+|\{.*\}|:.*|<.*>|\d+|\?.*)$", re.IGNORECASE)
 
@@ -224,12 +246,19 @@ def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
 
     person = (Element(keys(f"the person {cfg.person_name}", "user"), cfg.person_name, "person", cfg.person_description)
               if cfg.person_enabled else None)
+    if person:
+        person.cite(ASSUMPTION, "[person] in the config, or the default person")
     system_name = cfg.system_name or target
     system = Element(keys(f"the system {system_name}", f"{_key(system_name)}_system"), system_name, "system",
                      cfg.system_description or meta["description"] or f"System containing {target}.")
+    system.cite(ASSUMPTION, "system boundary from [system] in the config, or the target service's name")
     container = Element(keys(target), target, "container", description,
                         technology=tech, parent_key=system.key)
     system.children.append(container)
+    container.cite(_deps_call(target), "dependencies of the target service")
+    found = [k for k in ("description", "languages", "team") if meta[k]]
+    if found:
+        container.cite(_definition_call(target), ", ".join(found))
     # APM services by name: a name met again is the same element.
     services = {target: container}
     for name in cfg.include:
@@ -239,6 +268,8 @@ def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
                                      technology="APM service", parent_key=system.key,
                                      basis="[system] include")
             system.children.append(services[name])
+            if name in member_deps:
+                services[name].cite(_deps_call(name), "dependencies of the included service")
 
     model = C4Model(
         name=f"{system_name} - C4",
@@ -267,32 +298,42 @@ def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
         else:
             el = Element(key, name, "system", "Internal service observed in APM.", basis=basis)
             model.systems.append(el)
+        if types.get(name):
+            el.cite(TYPES_CALL, _type_counts(types[name]))
         services[name] = el
         return el
 
     # L0/L1 relationships at container level; Structurizr derives the
     # system-level ones (implied relationships) for the context view.
     if person:
-        model.relate(person.key, container.key, "Uses", "HTTPS")
+        rel = model.relate(person.key, container.key, "Uses", "HTTPS")
+        if rel:
+            rel.cite(ASSUMPTION, "the person uses the target service")
     for source_name, source_deps in [(target, deps), *member_deps.items()]:
         source = neighbour(source_name)
         if source is None:
             continue
-        for name in source_deps.get("calls", []) or []:
-            el = neighbour(name)
-            if el is not None:
-                model.relate(source.key, el.key, "Calls")
-        for name in source_deps.get("called_by", []) or []:
-            el = neighbour(name)
-            if el is not None:
-                model.relate(el.key, source.key, "Calls")
+        call = _deps_call(source_name)
+        for direction in ("calls", "called_by"):
+            for name in source_deps.get(direction, []) or []:
+                el = neighbour(name)
+                if el is None:
+                    continue
+                el.cite(call, direction)
+                rel = (model.relate(source.key, el.key, "Calls") if direction == "calls"
+                       else model.relate(el.key, source.key, "Calls"))
+                if rel:
+                    rel.cite(call, direction)
 
     # L2 components from entry-point resources. HTTP routes are called by the
     # person or, without one, by the services observed calling the target.
     callers = ([person.key] if person else
                [r.source_key for r in model.relationships if r.target_key == container.key])
+    caller_note = ("the person is drawn calling every HTTP endpoint group" if person else
+                   f"services calling {target} are drawn calling every HTTP endpoint group")
     groups = _group_resources(resources, cfg.max_components, cfg.strip_prefixes)
-    if not groups:
+    placeholder = not groups
+    if placeholder:
         groups = [("Request Handlers", "unknown",
                    ["No indexed spans found - refine by hand."], 0)]
     for name, comp_tech, samples, hits in groups:
@@ -301,9 +342,16 @@ def build_model(deps: dict[str, Any], resources: list[dict[str, Any]],
                        f"{shown}" + (f" - {hits} spans" if hits else ""),
                        technology=comp_tech, parent_key=container.key)
         container.children.append(comp)
+        if placeholder:
+            comp.cite(ASSUMPTION, "placeholder: no entry-point resources were found")
+        else:
+            comp.cite(_resources_call(target),
+                      f"{len(samples)} resource{'' if len(samples) == 1 else 's'}, {hits} spans")
         if comp_tech == HTTP_GROUP:
             for caller in callers:
-                model.relate(caller, comp.key, "Calls", "HTTPS")
+                rel = model.relate(caller, comp.key, "Calls", "HTTPS")
+                if rel:
+                    rel.cite(ASSUMPTION, caller_note)
 
     model.warnings = keys.warnings
     return model
