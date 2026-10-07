@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-07
+
 ### Added
 
 - `--json` writes `c4-model.json`: every element and relationship of the model, sorted and with no timestamp, so runs on the same data write the same file. Its format is `schema/c4-model.schema.json`, versioned by `schema_version`.
@@ -72,7 +74,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The README documents exporting PlantUML or Mermaid with the `structurizr/structurizr` image, which replaces the end-of-life structurizr-cli; CI checks the documented command writes all three views.
 - `examples/checkout-web/`: a `c4.toml` and saved responses for a web service and its worker.
 
-[Unreleased]: https://github.com/veritas-sovereign/datadog-structurizr/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/veritas-sovereign/datadog-structurizr/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/veritas-sovereign/datadog-structurizr/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/veritas-sovereign/datadog-structurizr/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/veritas-sovereign/datadog-structurizr/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/veritas-sovereign/datadog-structurizr/releases/tag/v0.1.0
