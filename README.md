@@ -16,7 +16,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/datadog-structurizr?logo=pypi&logoColor=white&label=PyPI)](https://pypi.org/project/datadog-structurizr/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-c9a227)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776ab?logo=python&logoColor=white)](pyproject.toml)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776ab?logo=python&logoColor=white)](pyproject.toml)
 [![Input](https://img.shields.io/badge/Input-Datadog%20APM-632ca6?logo=datadog&logoColor=white)](https://docs.datadoghq.com/tracing/)
 [![Output](https://img.shields.io/badge/Output-Structurizr%20DSL-438dd5)](https://docs.structurizr.com/dsl)
 [![Output](https://img.shields.io/badge/Output-Mermaid%20C4-ff3670?logo=mermaid&logoColor=white)](https://mermaid.js.org/syntax/c4.html)
@@ -51,7 +51,7 @@ It is meant as a starting point for architecture documentation. Keep `workspace.
 
 ## Quick Start
 
-With Python (3.10 or later):
+With Python (3.11 or later):
 
 ```bash
 pip install datadog-structurizr
@@ -79,8 +79,8 @@ Pick one:
 
 | Option | Best for | You need |
 | --- | --- | --- |
-| [PyPI](#from-pypi) | everyday use | Python 3.10+; optionally `mmdc` (Node.js) to render SVGs |
-| [From source](#from-source) | changing the tool or running its tests | Python 3.10+, git |
+| [PyPI](#from-pypi) | everyday use | Python 3.11+; optionally `mmdc` (Node.js) to render SVGs |
+| [From source](#from-source) | changing the tool or running its tests | Python 3.11+, git |
 | [Docker](#docker) | running without Python | Docker |
 
 You also need a Datadog API key and application key. See [Datadog access](#datadog-access).
@@ -168,6 +168,7 @@ datadog-structurizr [-c c4.toml] [--service NAME] [--env ENV] [--hours N] [-o DI
 | `--no-person` | draw no person; for services only called by other services |
 | `--offline` | rebuild from `<output>/raw/*.json` instead of calling Datadog; no keys needed |
 | `--no-raw` | do not save the Datadog responses to `<output>/raw/`. A later `--offline` run then has nothing to read. Cannot be combined with `--offline` |
+| `--json` | also write the model, with the evidence for each element and relationship, to `<output>/c4-model.json` (see [JSON output](#json-output)) |
 | `--no-render` | write `.dsl` and `.mmd` sources only; do not render images |
 | `--no-input` | never prompt (see [Prompts](#prompts)) |
 | `--version` | print the version |
@@ -270,6 +271,7 @@ output/
 ├── L0-SystemContext.mmd     Mermaid C4Context
 ├── L1-Containers.mmd        Mermaid C4Container
 ├── L2-Components.mmd        Mermaid C4Component
+├── c4-model.json            the model and its evidence, with --json
 ├── *.svg                    rendered views, if mmdc is installed
 ├── plantuml/                PlantUML export and images, if structurizr-cli and plantuml are installed
 └── raw/
@@ -283,6 +285,27 @@ output/
 `raw/` is replaced as a whole, and only after every Datadog call of the run has succeeded. It never mixes responses from different runs, and a failed run leaves the previous one in place. Do not keep other files in it.
 
 `raw/` holds your internal service and route names. Check it before you commit it anywhere public. Where the responses must not be stored at all, run with `--no-raw`: the diagrams are drawn from the responses in memory, and `raw/` is neither created nor changed. A `raw/` left by an earlier run stays as it is, and the run says so. The generated `.dsl` and `.mmd` files still contain the service and route names.
+
+### JSON output
+
+`--json` writes `c4-model.json`: the model the DSL and Mermaid files are drawn from, for other tools to read. It follows [`schema/c4-model.schema.json`](schema/c4-model.schema.json).
+
+- `elements` is every element, sorted by `key`, with its `parent`, `kind`, `external`, `database`, `technology` and `classified_by` (the same text as the DSL's `Classified by` property, or `null`).
+- `relationships` is every relationship, sorted by `source` and then `target`.
+- `source` names the service, env, lookback window and Datadog site; `warnings` holds the identifier warnings the run printed.
+
+Each element and relationship has an `evidence` list that says where it came from. An entry names the Datadog call, not a file in `raw/`, so it means the same with `--no-raw`:
+
+```json
+"evidence": [
+  {"source": "POST /api/v2/spans/analytics/aggregate by service and type", "detail": "span types redis 41000"},
+  {"source": "GET /api/v1/service_dependencies/checkout-web", "detail": "calls"}
+]
+```
+
+What the tool draws without Datadog data has `"source": "assumption"`: the person and its relationships, the system boundary, the relationships from the person or the callers to each HTTP endpoint group, and the placeholder component when no resources were found. Evidence is in the JSON only; the DSL and Mermaid files do not show it.
+
+The file has no timestamp and is sorted, so two runs on the same Datadog data write the same file and a diff shows only what changed. `schema_version` is raised when a field is removed, renamed or changes meaning; new fields can appear without it. The [Limitations](#limitations) apply to the JSON as much as to the diagrams: an element or relationship that is not in it was not seen in the window, which does not mean it does not exist.
 
 ### Typical workflow
 
@@ -428,6 +451,8 @@ Limits of the generated model:
 - **One system per run.** Run the command once per system and merge the workspaces by hand if you need a landscape view.
 - **Layout is automatic.** Structurizr views use `autoLayout`. Mermaid's C4 layout is basic; for presentation diagrams, use the Structurizr output.
 
+What is planned, and what is left out on purpose, is in [ROADMAP.md](ROADMAP.md).
+
 ## Examples
 
 | Directory | What it shows |
@@ -459,7 +484,7 @@ datadog-structurizr/
 │       ├── client.py            Datadog API calls; saves and replays raw responses
 │       ├── model.py             C4 model classes
 │       ├── mapper.py            maps Datadog data onto the C4 model
-│       ├── emitter.py           writes Structurizr DSL and Mermaid C4
+│       ├── emitter.py           writes Structurizr DSL, Mermaid C4 and JSON
 │       └── render.py            optional rendering with mmdc, or structurizr-cli and plantuml
 ├── examples/
 │   ├── README.md                how to run the sample
@@ -471,11 +496,15 @@ datadog-structurizr/
 │   ├── test_config.py           config file, precedence, prompts and errors
 │   ├── test_client.py           request shapes, fallbacks and errors, with fake responses
 │   ├── test_mapper.py           boundary, classification, ignore, person and components
-│   └── test_emitter.py          DSL nesting and Mermaid views
+│   ├── test_emitter.py          DSL nesting and Mermaid views
+│   ├── test_json.py             --json output against the schema and a golden file
+│   └── golden/                  expected c4-model.json of the example
+├── schema/
+│   └── c4-model.schema.json     JSON Schema of c4-model.json
 ├── .github/
 │   ├── dependabot.yml           weekly updates for GitHub Actions and the Docker base image
 │   └── workflows/
-│       ├── test.yml             pytest on Python 3.10 and 3.13, ruff and pyright, Structurizr validation, Docker image build
+│       ├── test.yml             pytest on Python 3.11 and 3.14, ruff and pyright, Structurizr validation, Docker image build
 │       ├── publish-pypi.yml     builds the package; publishes it to PyPI on v* tags
 │       └── publish-image.yml    tests the image; publishes it to GHCR on v* tags
 ├── Dockerfile                   image with the tool and no renderers; published to GHCR on releases
@@ -484,6 +513,7 @@ datadog-structurizr/
 ├── pyproject.toml               package metadata and datadog-structurizr command
 ├── requirements.txt             runtime dependencies
 ├── CHANGELOG.md
+├── ROADMAP.md                   planned work and what is left out on purpose
 ├── LICENSE
 ├── .editorconfig
 ├── .gitattributes
@@ -495,10 +525,11 @@ The package lives under `src/` so it can only be imported once installed, and so
 ### How a run works
 
 ```
-Datadog ──► client.py ──► mapper.py ──► emitter.py ──► datadog-*.dsl, *.mmd ──► render.py (optional)
-            fetch,         dependencies    DSL and                                mmdc, structurizr-cli
-            save raw/      and resources   Mermaid text
-                           to C4 model
+Datadog ──► client.py ──► mapper.py ──► emitter.py ──► datadog-*.dsl, *.mmd, c4-model.json ──► render.py (optional)
+            fetch,         dependencies    DSL, Mermaid                                          mmdc, structurizr-cli
+            save raw/      and resources   and JSON text
+                           to C4 model,
+                           with evidence
 ```
 
 ## Naming conventions

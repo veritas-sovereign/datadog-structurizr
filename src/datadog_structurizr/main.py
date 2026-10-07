@@ -8,8 +8,8 @@ from pathlib import Path
 from . import __version__
 from .client import DatadogAPIError, fetch_all
 from .config import load_config
-from .emitter import (MODEL_FILE, VIEWS_FILE, emit_dsl_model, emit_dsl_views, emit_mermaid,
-                      emit_workspace, inline_includes)
+from .emitter import (JSON_FILE, MODEL_FILE, VIEWS_FILE, emit_dsl_model, emit_dsl_views, emit_json,
+                      emit_mermaid, emit_workspace, inline_includes)
 from .mapper import build_model
 from .render import render_mermaid, render_structurizr
 
@@ -41,6 +41,9 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     cli.add_argument("--no-raw", action="store_true",
                      help="do not save the Datadog responses to <output>/raw/; they hold internal "
                           "service and route names, and --offline needs them")
+    cli.add_argument("--json", action="store_true",
+                     help=f"also write the model, with the evidence for each element and relationship, "
+                          f"to <output>/{JSON_FILE}")
     cli.add_argument("--no-render", action="store_true",
                      help="write .dsl and .mmd sources only; do not render images")
     cli.add_argument("--no-input", action="store_true",
@@ -88,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     for warning in model.warnings:
         print(f"      warning: {warning}")
 
-    print("[3/4] Writing Structurizr DSL and Mermaid sources...")
+    print("[3/4] Writing Structurizr DSL and Mermaid sources" + (" and JSON..." if args.json else "..."))
     out = cfg.output_dir
     (out / MODEL_FILE).write_text(emit_dsl_model(model), encoding="utf-8")
     (out / VIEWS_FILE).write_text(emit_dsl_views(model), encoding="utf-8")
@@ -106,6 +109,12 @@ def main(argv: list[str] | None = None) -> int:
         path = cfg.output_dir / f"{view}.mmd"
         path.write_text(text, encoding="utf-8")
         mmd_files.append(path)
+    json_path = None
+    if args.json:
+        json_path = out / JSON_FILE
+        json_path.write_text(emit_json(model, {"service": cfg.service, "env": cfg.env,
+                                               "lookback_hours": cfg.lookback_hours, "site": cfg.site}),
+                             encoding="utf-8")
 
     images = []
     if args.no_render:
@@ -119,6 +128,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  DSL : {inline_path} (single file for the Structurizr playground)")
     for p in mmd_files:
         print(f"  MMD : {p}")
+    if json_path:
+        print(f"  JSON: {json_path}")
     for p in images:
         print(f"  IMG : {p}")
     return 0

@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/veritas-sovereign/datadog-structurizr/blob/main/schema/c4-model.schema.json",
+  "title": "datadog-structurizr C4 model",
+  "description": "c4-model.json, written by datadog-structurizr --json. schema_version is raised when a field is removed, renamed or changes meaning; new fields can appear without it.",
+  "type": "object",
+  "required": ["schema_version", "generator", "source", "name", "description", "elements", "relationships", "warnings"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "generator": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"const": "datadog-structurizr"},
+        "version": {"type": "string"}
+      }
+    },
+    "source": {
+      "description": "Where the Datadog data came from.",
+      "type": "object",
+      "required": ["service", "env", "lookback_hours", "site"],
+      "properties": {
+        "service": {"type": "string"},
+        "env": {"type": "string"},
+        "lookback_hours": {"type": "integer", "minimum": 1},
+        "site": {"type": "string"}
+      }
+    },
+    "name": {"type": "string"},
+    "description": {"type": "string"},
+    "elements": {
+      "description": "Every element, sorted by key. Nesting is given by parent.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "name", "kind", "parent", "description", "technology", "external", "database",
+                     "classified_by", "evidence"],
+        "properties": {
+          "key": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+          "name": {"type": "string"},
+          "kind": {"enum": ["person", "system", "container", "component"]},
+          "parent": {"type": ["string", "null"]},
+          "description": {"type": "string"},
+          "technology": {"type": "string"},
+          "external": {"type": "boolean"},
+          "database": {"type": "boolean"},
+          "classified_by": {
+            "description": "The rule that placed a dependency or included service, as in the DSL's Classified by property; null for the others.",
+            "type": ["string", "null"]
+          },
+          "evidence": {"$ref": "#/$defs/evidence"}
+        }
+      }
+    },
+    "relationships": {
+      "description": "Every relationship, sorted by source and then target.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source", "target", "description", "technology", "evidence"],
+        "properties": {
+          "source": {"type": "string"},
+          "target": {"type": "string"},
+          "description": {"type": "string"},
+          "technology": {"type": "string"},
+          "evidence": {"$ref": "#/$defs/evidence"}
+        }
+      }
+    },
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "evidence": {
+      "description": "Where the item came from: the Datadog API call that returned it, or \"assumption\" for what is drawn without Datadog data.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["source", "detail"],
+        "properties": {
+          "source": {"type": "string"},
+          "detail": {"type": "string"}
+        }
+      }
+    }
+  }
+}
